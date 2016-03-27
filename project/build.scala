@@ -7,7 +7,15 @@ import sbt.Keys._
 import sbt._
 
 object imhereproject extends Build {
-  fork in run := true
-  connectInput in run := true
+
+  lazy val project = Project (
+    "ih",
+    file("."),
+    settings = Defaults.defaultSettings ++ Seq(
+      fork in run := true,
+      connectInput in run := true
+
+      )
+  )
 }
 

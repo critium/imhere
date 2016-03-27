@@ -37,50 +37,59 @@ object ServerStream {
 
 
   object RelayServer {
-    val r1 = Relay(55555)
+    @volatile var run = true
+    //val r1 = Relay(55555)
 
     case class Conns(socket:Socket)
 
-    class Relay(port) {
+    def connectToServer(serverName:String, port:Int) = {
+      //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
+      val client = new Socket(serverName,port);
+
+      client
+    }
+
+    class Relay(port:Int) {
       var allConns = List[Conns]()
 
       val serverSocket:ServerSocket = new ServerSocket(port)
 
-      while(runIt) {
+      Future(while(run) {
         println("Waiting for a connection")
-        val server:Socket = serverSocket.accept();
-      }
+        val socket:Socket = serverSocket.accept();
 
+        handleSocket(socket)
+      })
+
+      /**
+       * I think i need to repace the future with a true thread
+       */
       def handleSocket(socket:Socket):Future[Unit] = Future {
-        allConns += Conns(socket)
+        println("Added new socket connection")
+        allConns = Conns(socket) +: allConns
 
         // pipe input to all connections
+        val in = socket.getInputStream
         val out = socket.getOutputStream
         val bufSize = 1024*5
         val bytes = Array.ofDim[Byte](bufSize)
         while(true) {
+          in.read(bytes)
           if(allConns.size > 1) {
-            val others:List[Conn] = allConns.filter(_.socket != socket)
-            val playBytes = if(out.available == 0 ) {
+            val others:List[Conns] = allConns.filter(_.socket != socket)
+            val playBytes = if(socket.isConnected) {
               Array.ofDim[Byte](bufSize)
             } else {
               bytes
             }
             others.foreach { c =>
-              c.socket.getInputStream.write(playBytes)
+              out.write(playBytes)
             }
           } else {
+            println("no connections. sleeping")
             Thread.sleep(1*1000)
           }
         }
-      }
-
-      def setSender(port:Int, host:InetAddress) = {
-        sender = Conns(port, host)
-      }
-
-      def setReceiver(port:Int, host:InetAddress) = {
-        receiver = Conns(port, host)
       }
     }
   }
@@ -93,22 +102,23 @@ object ServerStream {
     }
 
     def getIn(serverName:String, port:Int):InputStream = {
-      //val client = new Socket(serverName,port);
-      //client.getInputStream();
-
-      val client = new DatagramSocket(port, InetAddress.getByName(serverName))
+      val client = new Socket(serverName,port);
       client.getInputStream();
-
+      //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
+      //client.getInputStream();
     }
 
   }
 
-  class Capture {
+  class Capture(socket:Option[Socket]) {
     @volatile var halt = false;
 
     def getOut = {
       //new FileOutputStream("/tmp/test.pcm");
-      HereServer.getOut(5555)
+      socket match {
+        case Some(s) => s.getOutputStream()
+        case _ => HereServer.getOut(5555)
+      }
     }
 
     def runIt:Unit  = {
@@ -175,14 +185,18 @@ object ServerStream {
     }
   }
 
-  class Playback {
+  class Playback(socket:Option[Socket]) {
     @volatile var pwait = true;
 
     var bufSize = 16384;
     def getIn = {
       //val file = new File("/tmp/test.pcm")
       //new FileInputStream(file)
-      HereServer.getIn("localhost", 5555)
+      socket match {
+        case Some(s) => s.getInputStream()
+        case _ => HereServer.getIn("localhost", 5555)
+      }
+
     }
 
     def runIt = {
@@ -263,22 +277,44 @@ object ServerStream {
 
 
   def capture = {
-    val c = new Capture();
+    val c = new Capture(None);
     val f1 = Future(c.runIt)
     val f2 = Future(c.haltAfter(10*1000))
   }
 
   def playback = {
-    val p = new Playback()
+    val p = new Playback(None)
     Future(p.runIt)
     Future(p.haltAfter(10*1000))
     //p.halt = true
+  }
+
+  def relay {
+    val r = new RelayServer.Relay(55555)
+    readLine()
+  }
+
+  def runclient = {
+    val socket = Option(RelayServer.connectToServer("localhost", 55555))
+
+    val c = new Capture(socket);
+    val f1 = Future(c.runIt)
+
+    val p = new Playback(socket)
+    Future(p.runIt)
+
+    readLine()
+
+    val f2 = Future(c.haltAfter(10*1000))
+    Future(p.haltAfter(10*1000))
   }
 
 
   def main (args:Array[String]):Unit = {
     println(args(0))
     args(0) match {
+      case i if i == "rc" => runclient
+      case i if i == "r" => relay
       case i if i == "c" => capture
       case _ => playback
     }
