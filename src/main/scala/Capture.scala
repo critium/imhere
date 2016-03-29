@@ -73,13 +73,16 @@ object ServerStream {
         val out = socket.getOutputStream
         val bufSize = 1024*5
         val bytes = Array.ofDim[Byte](bufSize)
+        var bytesRead = 0
         while(true) {
-          in.read(bytes)
+          bytesRead = in.read(bytes)
           if(allConns.size > 1) {
             val others:List[Conns] = allConns.filter(_.socket != socket)
-            val playBytes = if(socket.isConnected) {
+            val playBytes = if(bytesRead == -1) {
+              System.out.print("-")
               Array.ofDim[Byte](bufSize)
             } else {
+              System.out.print(".")
               bytes
             }
             others.foreach { c =>
