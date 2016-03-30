@@ -17,11 +17,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // [x] Split Objects, into playback and capture
 // [x] Test Server-Client Streaming
 // [p] Convert to DataGram (UDP)
-// [ ] Create 3rd server, for relaying, and sending audio format
-// [ ] Collect n mics
+// [x] Create 3rd server, for relaying, and sending audio format
+// [ ] Collect n>2 mics
 // [ ] Add speex
 // [ ] add variable quality, resample based on ui
+// [ ] Add noise Filtering
 // [ ] Add Encryption
+// [ ] Add PTT voice breakout
+// [ ] Add PTT Room
 
 object ServerStream {
   def getAudioFormat:AudioFormat = {
@@ -85,9 +88,11 @@ object ServerStream {
               System.out.print(".")
               bytes
             }
+
             others.foreach { c =>
               out.write(playBytes)
             }
+
           } else {
             println("no connections. sleeping")
             Thread.sleep(1*1000)
@@ -163,6 +168,7 @@ object ServerStream {
         if(numBytesRead == -1) {
           halt = true
         }
+        println(Conversions.toDoubleArray(data).mkString(","))
         out.write(data, 0, numBytesRead);
       }
 
