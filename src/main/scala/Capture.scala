@@ -31,8 +31,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object ServerStream {
   def getAudioFormat:AudioFormat = {
     var encoding = AudioFormat.Encoding.PCM_SIGNED;
-    val rate = 44000f
-    //val rate = 16000f
+    //val rate = 44000f
+    val rate = 18000f
     val sampleSize = 16
     val bigEndian = true
     val channels = 1
@@ -80,28 +80,52 @@ object ServerStream {
         val newConn =  Conns(getConnId, socket)
         allConns = newConn +: allConns
 
-        // pipe input to all connections
-        val in = socket.getInputStream
         val bufSize = 512*5
-        val bytes = Array.ofDim[Byte](bufSize)
         var bytesRead = 0
+
+        // pipe input to all connections
+        // val in = socket.getInputStream
+        // while(true) {
+        //   bytesRead = in.read(bytes)
+        //   if(allConns.size > 1) {
+        //     val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
+        //     val playBytes = if(bytesRead == -1) {
+        //       System.out.print("-")
+        //       Array.ofDim[Byte](bufSize)
+        //     } else {
+        //       System.out.print(".")
+        //       bytes
+        //     }
+
+        //     others.foreach { c =>
+        //       //System.out.print("("newConn.connId+">"+c")")
+        //       val out = c.socket.getOutputStream
+        //       out.write(playBytes)
+        //     }
+
+        //   } else {
+        //     println("no connections. sleeping")
+        //     Thread.sleep(1*1000)
+        //   }
+        // }
+
+        // Pipe output to all connections
+        val out = newConn.socket.getOutputStream()
         while(true) {
-          bytesRead = in.read(bytes)
           if(allConns.size > 1) {
             val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
-            val playBytes = if(bytesRead == -1) {
-              System.out.print("-")
-              Array.ofDim[Byte](bufSize)
-            } else {
-              System.out.print(".")
-              bytes
+
+            var allStreams:List[Array[Byte]] = others.map { c =>
+              val bytes = Array.ofDim[Byte](bufSize)
+              val bytesRead = c.socket.getInputStream().read(bytes)
+              if(bytesRead == -1) {
+                Array.ofDim[Byte](bufSize)
+              } else {
+                bytes
+              }
             }
 
-            others.foreach { c =>
-              //System.out.print("("newConn.connId+">"+c")")
-              val out = c.socket.getOutputStream
-              out.write(playBytes)
-            }
+            out.write(allStreams(0))
 
           } else {
             println("no connections. sleeping")
