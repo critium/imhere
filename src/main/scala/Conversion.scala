@@ -7,11 +7,38 @@ import java.nio._
  * Parts converted from http://stackoverflow.com/questions/16389205/simple-bandpass-filter-in-java
  */
 object Conversions {
-  val byteLen = 8
+  val dByteLen = 8
   def toByteArray(value:Double):Array[Byte] = {
-    val bytes = Array.ofDim[Byte](byteLen)
+    val bytes = Array.ofDim[Byte](dByteLen)
     ByteBuffer.wrap(bytes).putDouble(value)
     bytes
+  }
+
+  val sByteLen = 2
+  def toByteArrayFromShort(value:Short):Array[Byte] = {
+    val bytes = Array.ofDim[Byte](sByteLen)
+    ByteBuffer.wrap(bytes).putShort(value)
+    bytes
+  }
+
+  def toByteArrayFromShortArray(value:Array[Short]):Array[Byte] = {
+    val bytes = Array.ofDim[Byte](sByteLen * value.length)
+    value.foreach { v =>
+      ByteBuffer.wrap(bytes).putShort(v)
+    }
+    bytes
+  }
+
+  def ShortToByte_ByteBuffer_Method(input:Array[Short]):Array[Byte] = {
+    var iterations = input.length;
+
+    var bb = ByteBuffer.allocate(input.length * 2);
+
+    for(index <- 0 until iterations) {
+      bb.putShort(input(index));
+    }
+
+    bb.array();
   }
 
   def toDouble(bytes:Array[Byte]):Double = {

@@ -1,5 +1,7 @@
 package ih
 
+import ih.Conversions._
+
 import java.io._
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -51,7 +53,7 @@ object ServerStream {
     }
     //val r1 = Relay(55555)
 
-    case class Conns(connId:Long, socket:Socket)
+    case class Conns(connId:Long, socket:Socket, streamFctr:Float = 1)
 
     def connectToServer(serverName:String, port:Int) = {
       //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
@@ -115,17 +117,21 @@ object ServerStream {
           if(allConns.size > 1) {
             val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
 
-            var allStreams:List[Array[Byte]] = others.map { c =>
+            //var allStreams:List[Array[Byte]] = others.map { c =>
+            var allStreams:List[Array[Short]] = others.map { c =>
               val bytes = Array.ofDim[Byte](bufSize)
               val bytesRead = c.socket.getInputStream().read(bytes)
               if(bytesRead == -1) {
-                Array.ofDim[Byte](bufSize)
+                //Array.ofDim[Byte](bufSize)
+                Array.ofDim[Short](bufSize / timesShort)
               } else {
-                bytes
+                //bytes
+                toShortArray(bytes)
               }
             }
 
-            out.write(allStreams(0))
+            //out.write(allStreams(0))
+            out.write(ShortToByte_ByteBuffer_Method(allStreams(0)))
 
           } else {
             println("no connections. sleeping")
