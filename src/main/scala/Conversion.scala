@@ -1,7 +1,7 @@
 package ih
 
 import java.lang.Math
-import java.nio.ByteBuffer
+import java.nio._
 
 /**
  * Parts converted from http://stackoverflow.com/questions/16389205/simple-bandpass-filter-in-java
@@ -24,13 +24,26 @@ object Conversions {
     //db.array()
   //}
 
-  val times = java.lang.Double.SIZE / java.lang.Byte.SIZE
+  val timesDouble = java.lang.Double.SIZE / java.lang.Byte.SIZE
   def toDoubleArray(byteArray:Array[Byte]):Array[Double] = {
-    val doubles = Array.ofDim[Double]( byteArray.length / times )
+    val doubles = Array.ofDim[Double]( byteArray.length / timesDouble )
     for(i <- 0 until doubles.length) {
-      doubles(i) = ByteBuffer.wrap(byteArray, i*times, times).getDouble();
+      val byteBuff = ByteBuffer.wrap(byteArray, i*timesDouble, timesDouble)
+      byteBuff.order(ByteOrder.BIG_ENDIAN);
+      doubles(i) = byteBuff.getDouble();
     }
     doubles
+  }
+
+  val timesShort = java.lang.Short.SIZE / java.lang.Byte.SIZE
+  def toShortArray(byteArray:Array[Byte]):Array[Short] = {
+    val shorts = Array.ofDim[Short]( byteArray.length / timesShort )
+    for(i <- 0 until shorts.length) {
+      val byteBuff = ByteBuffer.wrap(byteArray, i*timesShort, timesShort)
+      byteBuff.order(ByteOrder.BIG_ENDIAN);
+      shorts(i) = byteBuff.getShort();
+    }
+    shorts
   }
 
   /**

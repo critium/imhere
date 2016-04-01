@@ -18,7 +18,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // [x] Test Server-Client Streaming
 // [p] Convert to DataGram (UDP)
 // [x] Create 3rd server, for relaying, and sending audio format
-// [ ] Collect n>2 mics
+// [x] Collect n>2 mics
+// [ ] mix the sources
+// [ ] Convert futures to threads?
 // [ ] Add speex
 // [ ] add variable quality, resample based on ui
 // [ ] Add noise Filtering
@@ -30,9 +32,10 @@ object ServerStream {
   def getAudioFormat:AudioFormat = {
     var encoding = AudioFormat.Encoding.PCM_SIGNED;
     val rate = 44000f
+    //val rate = 16000f
     val sampleSize = 16
     val bigEndian = true
-    val channels = 2
+    val channels = 1
 
     println("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
@@ -41,9 +44,14 @@ object ServerStream {
 
   object RelayServer {
     @volatile var run = true
+    @volatile var connId = 0l;
+    def getConnId = {
+      connId = connId + 1
+      connId
+    }
     //val r1 = Relay(55555)
 
-    case class Conns(socket:Socket)
+    case class Conns(connId:Long, socket:Socket)
 
     def connectToServer(serverName:String, port:Int) = {
       //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
@@ -69,18 +77,18 @@ object ServerStream {
        */
       def handleSocket(socket:Socket):Future[Unit] = Future {
         println("Added new socket connection")
-        allConns = Conns(socket) +: allConns
+        val newConn =  Conns(getConnId, socket)
+        allConns = newConn +: allConns
 
         // pipe input to all connections
         val in = socket.getInputStream
-        val out = socket.getOutputStream
-        val bufSize = 1024*5
+        val bufSize = 512*5
         val bytes = Array.ofDim[Byte](bufSize)
         var bytesRead = 0
         while(true) {
           bytesRead = in.read(bytes)
           if(allConns.size > 1) {
-            val others:List[Conns] = allConns.filter(_.socket != socket)
+            val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
             val playBytes = if(bytesRead == -1) {
               System.out.print("-")
               Array.ofDim[Byte](bufSize)
@@ -90,6 +98,8 @@ object ServerStream {
             }
 
             others.foreach { c =>
+              //System.out.print("("newConn.connId+">"+c")")
+              val out = c.socket.getOutputStream
               out.write(playBytes)
             }
 
@@ -168,7 +178,7 @@ object ServerStream {
         if(numBytesRead == -1) {
           halt = true
         }
-        println(Conversions.toDoubleArray(data).mkString(","))
+        println(Conversions.toShortArray(data).mkString(","))
         out.write(data, 0, numBytesRead);
       }
 
