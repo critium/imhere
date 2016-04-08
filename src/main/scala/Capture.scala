@@ -21,14 +21,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // [p] Convert to DataGram (UDP)
 // [x] Create 3rd server, for relaying, and sending audio format
 // [x] Collect n>2 mics
-// [ ] mix the sources
+// [x] mix the sources
 // [ ] Convert futures to threads?
-// [ ] Add speex
 // [ ] add variable quality, resample based on ui
 // [ ] Add noise Filtering
 // [ ] Add Encryption
 // [ ] Add PTT voice breakout
 // [ ] Add PTT Room
+// [ ] Add speex
+// [ ] optimize speed
+// [ ] optimize network
 
 object ServerStream {
   def getAudioFormat:AudioFormat = {
@@ -82,7 +84,8 @@ object ServerStream {
         val newConn =  Conns(getConnId, socket)
         allConns = newConn +: allConns
 
-        val bufSize = 512*5
+        //val bufSize = 512*5
+        val bufSize = 64*1
         var bytesRead = 0
 
         // pipe input to all connections
@@ -117,21 +120,39 @@ object ServerStream {
           if(allConns.size > 1) {
             val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
 
-            //var allStreams:List[Array[Byte]] = others.map { c =>
-            var allStreams:List[Array[Short]] = others.map { c =>
-              val bytes = Array.ofDim[Byte](bufSize)
-              val bytesRead = c.socket.getInputStream().read(bytes)
-              if(bytesRead == -1) {
-                //Array.ofDim[Byte](bufSize)
-                Array.ofDim[Short](bufSize / timesShort)
+            // working with shorts //var allStreams:List[Array[Byte]] = others.map { c =>
+            // working with shorts var allStreams:List[Array[Short]] = others.map { c =>
+            // working with shorts   val bytes = Array.ofDim[Byte](bufSize)
+            // working with shorts   val bytesRead = c.socket.getInputStream().read(bytes)
+            // working with shorts   if(bytesRead == -1) {
+            // working with shorts     //Array.ofDim[Byte](bufSize)
+            // working with shorts     Array.ofDim[Short](bufSize / timesShort)
+            // working with shorts   } else {
+            // working with shorts     //bytes
+            // working with shorts     toShortArray(bytes)
+            // working with shorts   }
+            // working with shorts }
+
+            // working with shorts //out.write(allStreams(0))
+            // working with shorts //add the sources and average them out and multiply by the factor
+            // working with shorts out.write(ShortToByte_ByteBuffer_Method(allStreams(0)))
+
+            val level = others.size
+            val baseline = Array.ofDim[Byte](bufSize)
+            var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
+              val readBytes = Array.ofDim[Byte](bufSize)
+              val byteCt= c.socket.getInputStream().read(readBytes)
+              if(byteCt == -1) {
+                l
               } else {
-                //bytes
-                toShortArray(bytes)
+                for(i <- 0 until bufSize) {
+                  l(i) = (l(i) + (((readBytes(i) / level)) * c.streamFctr).toInt).toByte
+                }
+                l
               }
             }
 
-            //out.write(allStreams(0))
-            out.write(ShortToByte_ByteBuffer_Method(allStreams(0)))
+            out.write(sumStreams)
 
           } else {
             println("no connections. sleeping")
@@ -196,8 +217,9 @@ object ServerStream {
       // play back the captured audio data
       val out = getOut
       val frameSizeInBytes = format.getFrameSize();
-      val bufferLengthInFrames = line.getBufferSize() / 8;
-      val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
+      //val bufferLengthInFrames = line.getBufferSize() / 8;
+      //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
+      val bufferLengthInBytes = 64
       val data = Array.ofDim[Byte]( bufferLengthInBytes );
       var numBytesRead = 0;
 
@@ -237,7 +259,8 @@ object ServerStream {
   class Playback(socket:Option[Socket]) {
     @volatile var pwait = true;
 
-    var bufSize = 16384;
+    //var bufSize = 16384;
+    var bufSize = 512*1
     def getIn = {
       //val file = new File("/tmp/test.pcm")
       //new FileInputStream(file)
@@ -265,8 +288,9 @@ object ServerStream {
       line = AudioSystem.getLine(info).asInstanceOf[SourceDataLine]
       line.open(format, bufSize);
 
-      val bufferLengthInFrames = line.getBufferSize() / 8;
-      val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
+      //val bufferLengthInFrames = line.getBufferSize() / 8;
+      //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
+      val bufferLengthInBytes = 64
       val data = Array.ofDim[Byte]( bufferLengthInBytes );
       var numBytesRead = 0;
 
