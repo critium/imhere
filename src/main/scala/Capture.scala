@@ -16,12 +16,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 //http://tutorials.jenkov.com/java-networking/udp-datagram-sockets.html
 //http://jspeex.sourceforge.net/
 // TODO:
-// [x] Split Objects, into playback and capture
-// [x] Test Server-Client Streaming
-// [p] Convert to DataGram (UDP)
-// [x] Create 3rd server, for relaying, and sending audio format
-// [x] Collect n>2 mics
-// [x] mix the sources
+// [√] Split Objects, into playback and capture
+// [√] Test Server-Client Streaming
+// [ ] Convert to DataGram (UDP)
+// [√] Create 3rd server, for relaying, and sending audio format
+// [√] Collect n>2 mics
+// [-] mix the sources
 // [ ] Convert futures to threads?
 // [ ] add variable quality, resample based on ui
 // [ ] Add noise Filtering
