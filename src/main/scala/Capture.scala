@@ -55,7 +55,7 @@ object ServerStream {
     }
     //val r1 = Relay(55555)
 
-    case class Conns(connId:Long, socket:Socket, streamFctr:Float = 1)
+    case class Conns(connId:Long, socket:Socket, srcIp:String, streamFctr:Float = 1)
 
     def connectToServer(serverName:String, port:Int) = {
       //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
@@ -80,8 +80,8 @@ object ServerStream {
        * I think i need to repace the future with a true thread
        */
       def handleSocket(socket:Socket):Future[Unit] = Future {
-        println("Added new socket connection")
-        val newConn =  Conns(getConnId, socket)
+        println("Added new socket connection: " + socket.getInetAddress.getHostAddress)
+        val newConn =  Conns(getConnId, socket, socket.getInetAddress.getHostAddress)
         allConns = newConn +: allConns
 
         //val bufSize = 512*5
@@ -151,8 +151,41 @@ object ServerStream {
                 l
               }
             }
-
             out.write(sumStreams)
+
+            // dynamic level check -- donesnt work: val othersGrouped:Map[String, List[Conns]] = allConns.filter(_.connId != newConn.connId).groupBy(_.srcIp)
+
+            // dynamic level check -- donesnt work: val others:Iterable[Array[Byte]] = othersGrouped.values.map { conns =>
+            // dynamic level check -- donesnt work:   // find the conn with the highest average dynamic level
+            // dynamic level check -- donesnt work:   val baseline = Array.ofDim[Byte](bufSize)
+            // dynamic level check -- donesnt work:   var dynamicLevel = 0d;
+
+            // dynamic level check -- donesnt work:   conns.foreach { c =>
+            // dynamic level check -- donesnt work:     val readBytes = Array.ofDim[Byte](bufSize)
+            // dynamic level check -- donesnt work:     val byteCt= c.socket.getInputStream().read(readBytes)
+            // dynamic level check -- donesnt work:     if(byteCt != -1) {
+            // dynamic level check -- donesnt work:       applyFctr(readBytes, c.streamFctr)
+            // dynamic level check -- donesnt work:       val newDynamicLevel = getLevel(readBytes)
+            // dynamic level check -- donesnt work:       if(newDynamicLevel > dynamicLevel) {
+            // dynamic level check -- donesnt work:         java.lang.System.arraycopy(readBytes, 0, baseline, 0, bufSize)
+            // dynamic level check -- donesnt work:         dynamicLevel = newDynamicLevel
+            // dynamic level check -- donesnt work:       }
+            // dynamic level check -- donesnt work:     }
+            // dynamic level check -- donesnt work:   }
+
+            // dynamic level check -- donesnt work:   baseline
+            // dynamic level check -- donesnt work: }
+
+            // dynamic level check -- donesnt work: val level = others.size
+            // dynamic level check -- donesnt work: val baseline = Array.ofDim[Byte](bufSize)
+            // dynamic level check -- donesnt work: var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,r ) =>
+            // dynamic level check -- donesnt work:   for(i <- 0 until bufSize) {
+            // dynamic level check -- donesnt work:     l(i) = (l(i) + (r(i) / level)).toByte
+            // dynamic level check -- donesnt work:   }
+            // dynamic level check -- donesnt work:   l
+            // dynamic level check -- donesnt work: }
+
+            // dynamic level check -- donesnt work: out.write(sumStreams)
 
           } else {
             println("no connections. sleeping")
@@ -160,6 +193,28 @@ object ServerStream {
           }
         }
       }
+    }
+
+    def applyFctr(ad: Array[Byte], fctr:Float):Unit = {
+      var i = 0
+      while (i<ad.length) {
+        ad(i) = (ad(i) * fctr).toByte
+      }
+    }
+
+    def getLevel(ad: Array[Byte]):Double = {
+      var sumPos = 0d
+      var sumNeg = 0d
+      var i = 0
+      while (i<ad.length) {
+        if(ad(i) > 0) {
+          sumPos += ad(i)
+        } else {
+          sumNeg += ad(i)
+        }
+        i += 1
+      }
+      sumPos - sumNeg
     }
   }
 
