@@ -59,6 +59,7 @@ object ServerStream {
     case class Conns(connId:Long, socket:Socket, srcIp:String, streamFctr:Float = 1)
 
     def connectToServer(serverName:String, port:Int) = {
+      println("Connecting to:" + serverName + " ON:" + port)
       //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
       val client = new Socket(serverName,port);
 
@@ -71,7 +72,7 @@ object ServerStream {
       val serverSocket:ServerSocket = new ServerSocket(port)
 
       Future(while(run) {
-        println("Waiting for a connection")
+        println("Waiting for a connection on " + port)
         val socket:Socket = serverSocket.accept();
 
         handleSocket(socket)
