@@ -18,13 +18,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // TODO:
 // [√] Split Objects, into playback and capture
 // [√] Test Server-Client Streaming
-// [ ] Convert to DataGram (UDP)
+// [x] Convert to DataGram (UDP)
 // [√] Create 3rd server, for relaying, and sending audio format
 // [√] Collect n>2 mics
-// [-] mix the sources
+// [ ] set configs
+// [-] mix the sources, run on server
 // [ ] Convert futures to threads?
 // [ ] add variable quality, resample based on ui
-// [ ] Add noise Filtering
+// [ ] Add noise Filtering on capture
 // [ ] Add Encryption
 // [ ] Add PTT voice breakout
 // [ ] Add PTT Room
@@ -417,15 +418,37 @@ object ServerStream {
     //p.halt = true
   }
 
-  def relay {
-    val r = new RelayServer.Relay(55555)
+  def relay(file:Option[String]) = {
+    val prop = new java.util.Properties()
+    val port:Option[Int] = for {
+      propFileName <- file
+      load <- Option(prop.load(new java.io.FileReader(propFileName)))
+      port <- Option(prop.getProperty("listen"))
+    } yield {
+      port.toInt
+    }
+    val r = new RelayServer.Relay(port.getOrElse(55555))
     readLine()
   }
 
-  def runclient = {
-    val socket = Option(RelayServer.connectToServer("localhost", 55555))
+  def runclient(file:Option[String]) = {
+    val prop = new java.util.Properties()
+    val hostAndPort:Option[(String, Int)] = for {
+      propFileName <- file
+      load <- Option(prop.load(new java.io.FileReader(propFileName)))
+      host <- Option(prop.getProperty("ihserver.host"))
+      port <- Option(prop.getProperty("ihserver.port"))
+    } yield {
+      (host, port.toInt)
+    }
 
-    val c = new Capture(socket);
+    val host = hostAndPort.map(_._1).getOrElse("localhost")
+    val port = hostAndPort.map(_._2).getOrElse(55555)
+    val socket = Option(RelayServer.connectToServer(
+      host, port
+    ))
+
+    val c = new Capture(socket)
     val f1 = Future(c.runIt)
 
     val p = new Playback(socket)
@@ -439,10 +462,14 @@ object ServerStream {
 
 
   def main (args:Array[String]):Unit = {
-    println(args(0))
+    val file = args.length match {
+      case 1 => None
+      case 2 => Some(args(1))
+    }
+    println(args(0) + " " + file)
     args(0) match {
-      case i if i == "rc" => runclient
-      case i if i == "r" => relay
+      case i if i == "rc" => runclient (file)
+      case i if i == "r" => relay (file)
       case i if i == "c" => capture
       case _ => playback
     }
