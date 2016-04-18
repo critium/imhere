@@ -72,9 +72,10 @@ object ServerStream {
       val serverSocket:ServerSocket = new ServerSocket(port)
 
       Future(while(run) {
-        println("Waiting for a connection on " + port)
+        print("Waiting for a connection on " + port + "...")
         val socket:Socket = serverSocket.accept();
 
+        println(" accepted:" + socket)
         handleSocket(socket)
       })
 
