@@ -18,10 +18,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // TODO:
 // [√] Split Objects, into playback and capture
 // [√] Test Server-Client Streaming
-// [x] Convert to DataGram (UDP)
+// [x] Convert to DataGram (UDP), move to much later on.  this is quite big
 // [√] Create 3rd server, for relaying, and sending audio format
 // [√] Collect n>2 mics
-// [ ] set configs
+// [√] set configs
 // [-] mix the sources, run on server
 // [ ] Convert futures to threads?
 // [ ] add variable quality, resample based on ui
@@ -153,7 +153,9 @@ object ServerStream {
                 l
               }
             }
+            print('.')
             out.write(sumStreams)
+            out.flush()
 
             // dynamic level check -- donesnt work: val othersGrouped:Map[String, List[Conns]] = allConns.filter(_.connId != newConn.connId).groupBy(_.srcIp)
 
@@ -283,12 +285,15 @@ object ServerStream {
       line.start();
 
       while (!halt) {
+        print("out:")
         numBytesRead = line.read(data, 0, bufferLengthInBytes)
         if(numBytesRead == -1) {
           halt = true
         }
-        println(Conversions.toShortArray(data).mkString(","))
+        print(Conversions.toShortArray(data).mkString(","))
         out.write(data, 0, numBytesRead);
+        out.flush()
+        println("done write")
       }
 
       // we reached the end of the stream.  stop and close the line.
