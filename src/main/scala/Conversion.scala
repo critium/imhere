@@ -73,6 +73,14 @@ object Conversions {
     shorts
   }
 
+  def toDoubleArray(shortArray:Array[Short]):Array[Double] = {
+    val doubles = Array.ofDim[Double](shortArray.length)
+    for(i <- 0 until doubles.length) {
+      doubles(i) = shortArray(i).asInstanceOf[Double]
+    }
+    doubles
+  }
+
   /**
    * @see - http://www.mathworks.com/help/signal/ref/blackman.html
    * @param length

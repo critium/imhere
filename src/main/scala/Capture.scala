@@ -12,6 +12,8 @@ import javax.sound.sampled.SourceDataLine._
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 
+import com.sun.media.sound._
+
 //http://stackoverflow.com/questions/26550514/streaming-audio-from-microphone-with-java
 //http://tutorials.jenkov.com/java-networking/udp-datagram-sockets.html
 //http://jspeex.sourceforge.net/
@@ -22,26 +24,32 @@ import scala.concurrent.ExecutionContext.Implicits.global
 // [√] Create 3rd server, for relaying, and sending audio format
 // [√] Collect n>2 mics
 // [√] set configs
-// [-] mix the sources, run on server
-// [ ] Convert futures to threads?
-// [ ] add variable quality, resample based on ui
+// [√] mix the sources, run on server
 // [ ] Add noise Filtering on capture
-// [ ] Add Encryption
 // [ ] Add PTT voice breakout
 // [ ] Add PTT Room
+// [ ] Add auto leveling on capture?
+// [ ] Convert futures to threads?
+// [ ] add variable quality, resample based on ui
+// [ ] Add Encryption
 // [ ] Add speex
 // [ ] optimize speed
 // [ ] optimize network
 
 object ServerStream {
-  def getAudioFormat:AudioFormat = {
-    var encoding = AudioFormat.Encoding.PCM_SIGNED;
-    //val rate = 44000f
-    val rate = 18000f
-    val sampleSize = 16
-    val bigEndian = true
-    val channels = 1
+  var encoding = AudioFormat.Encoding.PCM_SIGNED;
+  //val rate = 44000f
+  val rate = 18000f
+  val sampleSize = 16
+  val bigEndian = true
+  val channels = 1
 
+  val voiceLow = 300f
+  val voiceHigh = 3000f
+  val voiceResonance = (voiceLow + voiceHigh) / 2
+  val voiceFrequency = voiceHigh - voiceLow
+
+  def getAudioFormat:AudioFormat = {
     println("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
   }
@@ -280,21 +288,44 @@ object ServerStream {
       //val bufferLengthInFrames = line.getBufferSize() / 8;
       //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
       val bufferLengthInBytes = 64
-      val data = Array.ofDim[Byte]( bufferLengthInBytes );
+      val sbuffer:SoftAudioBuffer  = new SoftAudioBuffer(bufferLengthInBytes / Conversions.timesShort, format)
+      val filter:SoftFilter = new SoftFilter(format.getSampleRate())
+      filter.setFilterType(SoftFilter.FILTERTYPE_BP12);
+      filter.setResonance(voiceResonance);
+      filter.setFrequency(voiceFrequency);
+      val data = Array.ofDim[Byte]( bufferLengthInBytes )
       var numBytesRead = 0;
+
+      val converter = AudioFloatConverter.getConverter(format)
 
       line.start();
 
+      //val kernel = Conversions.bandPassKernel(bufferLengthInBytes / Conversions.timesShort, 300 / (ServerStream.rate/2) , 3000d / (ServerStream.rate/2))
+
+      // we use short bc we have encoded in 16 bit
+      val floatBuf:Array[Float] = Array.ofDim[Float](bufferLengthInBytes / timesShort)
+
       while (!halt) {
-        print("out:")
+        //print("out:")
         numBytesRead = line.read(data, 0, bufferLengthInBytes)
         if(numBytesRead == -1) {
           halt = true
         }
-        print(Conversions.toShortArray(data).mkString(","))
+
+        //val signal:Array[Short] = Conversions.toShortArray(data)
+        val signal:Array[Float] = converter.toFloatArray(data, 0, floatBuf, 0, floatBuf.length)
+        val sbufferData:Array[Float] = sbuffer.array()
+        java.lang.System.arraycopy(signal, 0, sbufferData, 0, sbufferData.length)
+        println("Orig: " + signal.mkString(","))
+
+        filter.processAudio(sbuffer)
+
+        println("Filt:" + sbufferData.mkString(","))
+
+        sbuffer.get(data, 0)
+
         out.write(data, 0, numBytesRead);
         out.flush()
-        println("done write")
       }
 
       // we reached the end of the stream.  stop and close the line.
