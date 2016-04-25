@@ -1,6 +1,6 @@
-package ih
+package together.audio
 
-import ih.Conversions._
+import together.audio.Conversions._
 
 import java.io._
 import java.net.ServerSocket;
@@ -44,6 +44,7 @@ object ServerStream {
   val bigEndian = true
   val channels = 1
 
+
   val voiceLow = 300f
   val voiceHigh = 3000f
   val voiceResonance = (voiceLow + voiceHigh) / 2
@@ -56,6 +57,10 @@ object ServerStream {
 
 
   object RelayServer {
+    var port = 0
+    var host = ""
+    var ip = ""
+
     @volatile var run = true
     @volatile var connId = 0l;
     def getConnId = {
