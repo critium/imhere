@@ -1,5 +1,6 @@
 package together.data
 
+import java.net.Socket
 import together.audio.AudioServer._
 import together.audio.AudioServer.RelayServer
 
@@ -22,9 +23,13 @@ object DataService {
   // all users
   @volatile private var _users = mutable.Map[Long, User]()
 
+  // all sockets
+  @volatile private var _sockets = mutable.Map[Long, Socket]()
+
   // views are rooms and users on the user's perspective
   @volatile private var _views = mutable.Map[Long, View]()
 
+  def hash(userId:Long) = "#"
 
   /**
    * Puts a person into the user group and the default room (no room?)
@@ -40,7 +45,7 @@ object DataService {
 
     // Create the Login Info.  Normally this should be based on Domain Info.  Basically we need to put the people
     // in the same domain on the same server.  For larger instances this should break down into groups as well.
-    val webView = WebView(user.id, lobby, getPeopleInRoomId(user, lobby.id))
+    val webView = WebView(user.id, lobby, user.hash, getPeopleInRoomId(user, lobby.id))
 
     val view = View(webView, None)
 
@@ -100,8 +105,39 @@ object DataService {
    * Login the user from the audio socket
    * DUMMY ONLY
    */
-  def loginAudioUser(audioUser:Option[AudioUser]):Try[AudioView] = {
-    val av = AudioView(0, lobby, List[AudioUser]())
-    Success(av)
+  def loginAudioUser(audioLogin:Option[AudioLogin], socket:Socket):Try[AudioLogin] = {
+    audioLogin match {
+      case Some(audioLogin) =>
+        // TODO: do something with the hash
+        // TODO: Can be mis-matched if user changes rooms before audio becomes available
+
+        // get the ppl in the lobby
+        val user = _users(audioLogin.userId)
+        val pplInLobby = getPeopleInRoomId(user, lobbyRoomId)
+
+        _sockets += (audioLogin.userId -> socket)
+
+        Success(audioLogin)
+      case _ => Failure(new IllegalArgumentException("audioLogin is None"))
+    }
   }
+
+  def getRoomIdForUserId(userId:Long):Long = {
+    lobbyRoomId
+  }
+
+  def getAudioViewForUser(userId:Long):AudioView = {
+    val roomId = getRoomIdForUserId(userId)
+    val user = _users(userId)
+    val theUsers = getPeopleInRoomId(user, roomId)
+    val people:List[AudioUser] = theUsers.flatMap { case (k, u) =>
+      _sockets.get(u.id).map { s =>
+        AudioUser(k, s, 5, u.hash)
+      }
+    }.toList
+
+    //HACK!
+    AudioView(userId, getRoom(user, roomId).get, people)
+  }
+
 }

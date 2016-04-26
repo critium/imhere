@@ -24,6 +24,7 @@ object AudioServer {
   val bigEndian = true
   val channels = 1
 
+
   // for bandpass
   val voiceLow = 300f
   val voiceHigh = 3000f
@@ -59,64 +60,61 @@ object AudioServer {
 
       def loginUser(socket:Socket):Future[Unit] = {
         println("Added new socket connection: " + socket.getInetAddress.getHostAddress)
-        val audioUserMaybe = AudioUser.fromStream(socket.getInputStream())
+        val audioLoginMaybe = AudioLogin.fromStream(socket.getInputStream())
 
-        DataService.loginAudioUser(audioUserMaybe) match {
-          case Success(audioView) =>
-            handleSocket(audioView)
+        DataService.loginAudioUser(audioLoginMaybe, socket) match {
+          case Success(audioLogin) =>
+            handleSocket(audioLogin.userId, socket)
           case Failure(e) => {
+            //TODO: handleSocketError();
             e.printStackTrace
             Future(Unit)
           }
         }
       }
 
-      // /**
-      //  * I think i need to repace the future with a true thread
-      //  */
-       def handleSocket(audioView:AudioView):Future[Unit] = Future {
-         Unit
-       }
-      //   println("Added new socket connection: " + socket.getInetAddress.getHostAddress)
-      //   val newConn =  Conns(getConnId, socket, socket.getInetAddress.getHostAddress)
-      //   allConns = newConn +: allConns
+       /**
+        * I think i need to repace the future with a true thread
+        */
+      def handleSocket(userId:Long, socket:Socket):Future[Unit] = Future {
+        println(s"Login Success For: ${userId}/${socket.getInetAddress.getHostAddress}")
 
-      //   //val bufSize = 512*5
-      //   val bufSize = 64*1
-      //   var bytesRead = 0
+        //val bufSize = 512*5
+        val bufSize = 64*1
+        var bytesRead = 0
 
+        // Pipe output to all connections
+        val out = socket.getOutputStream()
 
-      //   // Pipe output to all connections
-      //   val out = newConn.socket.getOutputStream()
-      //   while(true) {
-      //     if(allConns.size > 1) {
-      //       val others:List[Conns] = allConns.filter(_.connId != newConn.connId)
+        while(true) {
+          val view= DataService.getAudioViewForUser(userId)
+          if(view.people.size > 1) {
+            val others:List[AudioUser] = view.people.filter(_.userId != userId)
 
+            val level = others.size
+            val baseline = Array.ofDim[Byte](bufSize)
+            var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
+              val readBytes = Array.ofDim[Byte](bufSize)
+              val byteCt= c.socket.getInputStream().read(readBytes)
+              if(byteCt == -1) {
+                l
+              } else {
+                for(i <- 0 until bufSize) {
+                  l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                }
+                l
+              }
+            }
+            print('.')
+            out.write(sumStreams)
+            out.flush()
 
-      //       val level = others.size
-      //       val baseline = Array.ofDim[Byte](bufSize)
-      //       var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
-      //         val readBytes = Array.ofDim[Byte](bufSize)
-      //         val byteCt= c.socket.getInputStream().read(readBytes)
-      //         if(byteCt == -1) {
-      //           l
-      //         } else {
-      //           for(i <- 0 until bufSize) {
-      //             l(i) = (l(i) + (((readBytes(i) / level)) * c.streamFctr).toInt).toByte
-      //           }
-      //           l
-      //         }
-      //       }
-      //       print('.')
-      //       out.write(sumStreams)
-      //       out.flush()
-
-      //     } else {
-      //       println("no connections. sleeping")
-      //       Thread.sleep(1*1000)
-      //     }
-      //   }
-      // }
+          } else {
+            println("no connections. sleeping")
+            Thread.sleep(1*1000)
+          }
+        }
+      }
     }
 
     def applyFctr(ad: Array[Byte], fctr:Float):Unit = {

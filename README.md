@@ -18,6 +18,7 @@
 // [.] Add Web Backend to work with UI
 // [.] Add PTT voice breakout
 // [.] Add PTT Room
+// [.] Add Server REsponse on AudioLogin
 
 // [ ] Add auto leveling on capture?
 // [ ] Convert futures to threads?

@@ -13,7 +13,14 @@ object imhereproject extends Build {
     file("."),
     settings = Defaults.defaultSettings ++ Seq(
       fork in run := true,
-      connectInput in run := true
+      connectInput in run := true,
+
+      // Read here for optional jars and dependencies
+      libraryDependencies ++= Seq("org.specs2" %% "specs2-core" % "3.7.2" % "test"),
+      libraryDependencies ++= Seq("org.json4s" %% "json4s-native" % "3.2.11"),
+
+
+      scalacOptions in Test ++= Seq("-Yrangepos")
 
       )
   )
