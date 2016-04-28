@@ -33,17 +33,24 @@ package object data {
   }
 
 
-  case class Room(id:Long, name:String, people:mutable.Map[Long, User])
-  object Room {
-    type RoomConverter = Room => JValue
-    implicit def roomToJValue:RoomConverter = { s => {
+  case class Room(id:Long, name:String, people:mutable.Map[Long, User]) {
+    def toWebRoom = {
+      WebRoom(id, name, people.values.toList)
+    }
+  }
+
+
+  case class WebRoom(id:Long, name:String, people:List[User])
+  object WebRoom {
+    type WebRoomConverter = WebRoom => JValue
+    implicit def webRoomToJValue:WebRoomConverter = { s => {
       ("id"-> s.id) ~
       ("name" -> s.name) ~
-      ("people" -> s.people.map { case (k:Long,u:User) => u })
+      ("people" -> s.people)
     }}
   }
 
-  case class WebView(userId:Long, currentRoom:Room, hash:String)
+  case class WebView(userId:Long, currentRoom:WebRoom, hash:String)
   object WebView {
     type WebViewConverter = WebView => JValue
     implicit def webViewToJValue:WebViewConverter = { s => {

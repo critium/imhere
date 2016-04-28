@@ -1,0 +1,40 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- encoders are assigned the type
+         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>%d [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>together-api-${AKKA_SYSTEM_ROLE:-default}.current.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <!-- daily rollover + 100M max check -->
+        <fileNamePattern>wm-api-${AKKA_SYSTEM_ROLE:-default}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+            <maxFileSize>100MB</maxFileSize>
+        </timeBasedFileNamingAndTriggeringPolicy>
+        <maxHistory>15</maxHistory> <!-- days -->
+    </rollingPolicy>
+
+    <encoder>
+        <pattern>%d [%thread] %-5level %logger{35} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="scala.slick" level="INFO"/>
+  <logger name="org.eclise" level="ERROR"/>"
+  <logger name="org.quartz" level="INFO"/>
+  <logger name="com.wealthminder" level="DEBUG"/>
+  <logger name="com.wealthminder.webapi.finance.PortfolioResultsSimulator" level="INFO" />
+
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="FILE" />
+    <appender-ref ref="ASYNC_SLACK" />
+  </root>
+
+
+</configuration>

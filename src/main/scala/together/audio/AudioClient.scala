@@ -9,6 +9,7 @@ import java.net.Socket;
 import javax.sound.sampled._
 import javax.sound.sampled.SourceDataLine._
 
+import scala.util._
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -263,6 +264,8 @@ object AudioClient {
 
     implicit val formats = DefaultFormats
 
+    var loginInfo:Option[LoginInfo] = None
+
     def login:String = {
       val url = s"${protocol}${host}${loginP}"
       val user:User = User(1, "test1", 1, 1, "#")
@@ -271,9 +274,20 @@ object AudioClient {
       val response: HttpResponse[String] =
         Http(url).postData(data).header("content-type", "application/json").asString
 
-      println(response.toString)
+      loginInfo = Try(parse(response.body).extract[LoginInfo]) match {
+        case Success(v) => Some(v)
+        case Failure(e) =>
+          e.printStackTrace()
+          None
+      }
 
-      response.toString
+      println("  RCV: " + loginInfo)
+
+      if(loginInfo.isDefined) {
+        "web logged in"
+      } else {
+        "not logged in"
+      }
     }
   }
 
@@ -286,10 +300,10 @@ object AudioClient {
 
     var consoleMsg = """
     Commands are (yes, it is case sensitive):
-    halt - stop this server
-    webconnect <hostname> - connect to web server
-    audioconnect - connect to audio server
-    disconnect - disconnect to both audio and webserver
+      halt                  - stop this server
+      webconnect <hostname> - connect to web server
+      audioconnect          - connect to audio server
+      disconnect            - disconnect to both audio and webserver
     """
 
     def run = {
@@ -315,7 +329,20 @@ object AudioClient {
                 }
             }
           case h if h.equals("audioconnect") =>
-            println("not yet implemented")
+            val res = for {
+              wc <- wc
+              li <- wc.loginInfo
+            } yield {
+              val host = li.hostInfo.name
+              val port = li.hostInfo.port
+              runclient(host, port)
+              println(s"Connecting to server....${host}:${port}")
+              Unit
+            }
+
+            if(!res.isDefined) {
+              println(s"No Login info to connect to server.")
+            }
           case h if h.equals("disconnect") =>
             println("not yet implemented")
           case _ =>
@@ -338,19 +365,7 @@ object AudioClient {
     //p.halt = true
   }
 
-  def runclient(file:Option[String]) = {
-    val prop = new java.util.Properties()
-    val hostAndPort:Option[(String, Int)] = for {
-      propFileName <- file
-      load <- Option(prop.load(new java.io.FileReader(propFileName)))
-      host <- Option(prop.getProperty("ihserver.host"))
-      port <- Option(prop.getProperty("ihserver.port"))
-    } yield {
-      (host, port.toInt)
-    }
-
-    val host = hostAndPort.map(_._1).getOrElse("localhost")
-    val port = hostAndPort.map(_._2).getOrElse(55555)
+  def runclient(host:String, port:Int):Unit = {
     val socket = Option(connectToServer(
       host, port
     ))
@@ -365,6 +380,23 @@ object AudioClient {
 
     val f2 = Future(c.haltAfter(10*1000))
     Future(p.haltAfter(10*1000))
+  }
+
+  def runclient(file:Option[String]):Unit = {
+    val prop = new java.util.Properties()
+    val hostAndPort:Option[(String, Int)] = for {
+      propFileName <- file
+      load <- Option(prop.load(new java.io.FileReader(propFileName)))
+      host <- Option(prop.getProperty("ihserver.host"))
+      port <- Option(prop.getProperty("ihserver.port"))
+    } yield {
+      (host, port.toInt)
+    }
+
+    val host = hostAndPort.map(_._1).getOrElse("localhost")
+    val port = hostAndPort.map(_._2).getOrElse(55555)
+
+    runclient(host, port)
   }
 
 

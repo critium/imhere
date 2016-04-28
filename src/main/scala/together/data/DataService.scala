@@ -45,7 +45,7 @@ object DataService {
 
     // Create the Login Info.  Normally this should be based on Domain Info.  Basically we need to put the people
     // in the same domain on the same server.  For larger instances this should break down into groups as well.
-    val webView = WebView(user.id, lobby, user.hash)
+    val webView = WebView(user.id, lobby.toWebRoom, user.hash)
 
     val view = View(webView, None)
 
@@ -97,7 +97,7 @@ object DataService {
   /**
    * Hardcoded for now...
    */
-  def getHostInfo(user:User):HostInfo  ={
+  def getHostInfo(user:User):HostInfo = {
     HostInfo(1, RelayServer.ip, RelayServer.host, RelayServer.port)
   }
 

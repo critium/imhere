@@ -44,8 +44,9 @@ object AudioServer {
 
     @volatile var run = true
 
-    class Relay(incPort:Int) {
+    class Relay(incPort:Int, clientHost:String) {
       port = incPort
+      host = clientHost
 
       val serverSocket:ServerSocket = new ServerSocket(port)
 
@@ -143,15 +144,17 @@ object AudioServer {
 
   def relay(file:Option[String]) = {
     val prop = new java.util.Properties()
-    val port:Option[Int] = for {
+    val r:Option[RelayServer.Relay] = for {
       propFileName <- file
       load <- Option(prop.load(new java.io.FileReader(propFileName)))
       port <- Option(prop.getProperty("listen"))
+      host <- Option(prop.getProperty("hostname"))
     } yield {
-      port.toInt
+      val portAsInt = port.toInt
+      new RelayServer.Relay(portAsInt, host)
     }
-    val r = new RelayServer.Relay(port.getOrElse(55555))
-    readLine()
+
+    r.getOrElse(new RelayServer.Relay(55555, "localhost"))
   }
 
   def main (args:Array[String]):Unit = {

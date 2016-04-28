@@ -27,7 +27,9 @@ class LoginServlet extends ScalatraServlet with JacksonJsonSupport {
     contentType = formats("json")
     val u:User = parsedBody.extract[User]
     DataService.login(u) match {
-      case Some(l) => render(l)
+      case Some(l) =>
+        logger.debug("Sending " + l)
+        render(l)
       case _ => BadRequest()
     }
 
