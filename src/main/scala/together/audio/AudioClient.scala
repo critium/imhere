@@ -248,6 +248,82 @@ object AudioClient {
     }
   }
 
+  class WebClient(host:String) {
+    import scalaj.http._
+    import together.data._
+    import org.json4s._
+    import org.json4s.JsonDSL._
+    import org.json4s.jackson.JsonMethods._
+    import org.json4s.jackson.Serialization
+    import org.json4s.jackson.Serialization.{read, write}
+
+    var protocol = "http://"
+    var auth = "/auth"
+    var loginP = s"${auth}/login"
+
+    implicit val formats = DefaultFormats
+
+    def login:String = {
+      val url = s"${protocol}${host}${loginP}"
+      val user:User = User(1, "test1", 1, 1, "#")
+      val json:JValue = user
+      val data:String = write(json)
+      val response: HttpResponse[String] =
+        Http(url).postData(data).header("content-type", "application/json").asString
+
+      println(response.toString)
+
+      response.toString
+    }
+  }
+
+  class ConsoleClient {
+    @volatile var running = true
+
+    val WEBCONNECT = "webconnect"
+
+    var wc:Option[WebClient] = None
+
+    var consoleMsg = """
+    Commands are (yes, it is case sensitive):
+    halt - stop this server
+    webconnect <hostname> - connect to web server
+    audioconnect - connect to audio server
+    disconnect - disconnect to both audio and webserver
+    """
+
+    def run = {
+      println(consoleMsg)
+      while(running) {
+        val command = readLine()
+
+        command match {
+          case h if h.equals("halt") =>
+            running = false
+          case h if h.startsWith(WEBCONNECT) =>
+            wc match {
+              case Some(wc) =>
+                println("Already connected. Disconnect first")
+              case _ =>
+                if(WEBCONNECT.length + 1 >= h.length) {
+                  println("->Unable to connect.  No hostname")
+                } else {
+                  val host = h.substring(WEBCONNECT.length + 1, h.length)
+                  println("Connecting to " + host)
+                  wc = Some(new WebClient(host))
+                  wc.map(_.login)
+                }
+            }
+          case h if h.equals("audioconnect") =>
+            println("not yet implemented")
+          case h if h.equals("disconnect") =>
+            println("not yet implemented")
+          case _ =>
+            println(consoleMsg)
+        }
+      }
+    }
+  }
 
   def capture = {
     val c = new Capture(None);
@@ -293,15 +369,6 @@ object AudioClient {
 
 
   def main (args:Array[String]):Unit = {
-    val file = args.length match {
-      case 1 => None
-      case 2 => Some(args(1))
-    }
-    println(args(0) + " " + file)
-    args(0) match {
-      case i if i == "rc" => runclient (file)
-      case i if i == "c" => capture
-      case _ => playback
-    }
+    new ConsoleClient().run
   }
 }
