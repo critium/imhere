@@ -7,14 +7,14 @@ http://jspeex.sourceforge.net/
 TODO:
 
 # Very basic POC
-- [√] Split Objects, into playback and capture
-- [√] Test Server-Client Streaming
-- [x] Convert to DataGram (UDP), move to much later on.  this is quite big
-- [√] Create 3rd server, for relaying, and sending audio format
-- [√] Collect n>2 mics
-- [√] set configs
-- [√] mix the sources, run on server
-- [√] Add noise Filtering on capture
+- [x] Split Objects, into playback and capture
+- [x] Test Server-Client Streaming
+- [ ] Convert to DataGram (UDP), move to much later on.  this is quite big
+- [x] Create 3rd server, for relaying, and sending audio format
+- [x] Collect n>2 mics
+- [x] set configs
+- [x] mix the sources, run on server
+- [x] Add noise Filtering on capture
 
 # Conver to channels and use disruptor - will need this because we want to mix on each individual channel.
 - [ ] Convert audio client to channel
@@ -22,11 +22,11 @@ TODO:
 - [ ] Add magic ring buffer to store byte arrays
 
 # UI
-- [.] Add Electron UI
-- [.] Add Web Backend to work with UI
-- [.] Add PTT voice breakout
-- [.] Add PTT Room
-- [.] Add Server REsponse on AudioLogin
+- [ ] InProg. Add Electron UI
+- [ ] InProg. Add Web Backend to work with UI
+- [ ] InProg. Add PTT voice breakout
+- [ ] InProg. Add PTT Room
+- [ ] InProg. Add Server REsponse on AudioLogin
 
 #POLISH
 - [ ] Add auto leveling on capture?
