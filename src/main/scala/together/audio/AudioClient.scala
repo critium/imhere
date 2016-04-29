@@ -1,5 +1,6 @@
 package together.audio
 
+import together.data._
 import together.audio.Conversions._
 
 import java.io._
@@ -15,7 +16,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.sun.media.sound._
 
+import org.slf4j.LoggerFactory
+
 object AudioClient {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   var encoding = AudioFormat.Encoding.PCM_SIGNED;
   val rate = 18000f
   val sampleSize = 16
@@ -123,11 +128,11 @@ object AudioClient {
         val signal:Array[Float] = converter.toFloatArray(data, 0, floatBuf, 0, floatBuf.length)
         val sbufferData:Array[Float] = sbuffer.array()
         java.lang.System.arraycopy(signal, 0, sbufferData, 0, sbufferData.length)
-        println("Orig: " + signal.mkString(","))
+        //println("Orig: " + signal.mkString(","))
 
         filter.processAudio(sbuffer)
 
-        println("Filt:" + sbufferData.mkString(","))
+        //println("Filt:" + sbufferData.mkString(","))
 
         sbuffer.get(data, 0)
 
@@ -249,7 +254,7 @@ object AudioClient {
     }
   }
 
-  class WebClient(host:String) {
+  class WebClient(host:String, uid:Long, name:String, domainId:Long, groupId:Long) {
     import scalaj.http._
     import together.data._
     import org.json4s._
@@ -268,7 +273,7 @@ object AudioClient {
 
     def login:String = {
       val url = s"${protocol}${host}${loginP}"
-      val user:User = User(1, "test1", 1, 1, "#")
+      val user:User = User(uid, name, domainId, groupId, "#")
       val json:JValue = user
       val data:String = write(json)
       val response: HttpResponse[String] =
@@ -300,10 +305,10 @@ object AudioClient {
 
     var consoleMsg = """
     Commands are (yes, it is case sensitive):
-      halt                  - stop this server
-      webconnect <hostname> - connect to web server
-      audioconnect          - connect to audio server
-      disconnect            - disconnect to both audio and webserver
+      halt                                    - stop this server
+      webconnect <hostname> <uid> <did> <gid> - connect to web server
+      audioconnect                            - connect to audio server
+      disconnect                              - disconnect to both audio and webserver
     """
 
     def run = {
@@ -319,12 +324,17 @@ object AudioClient {
               case Some(wc) =>
                 println("Already connected. Disconnect first")
               case _ =>
-                if(WEBCONNECT.length + 1 >= h.length) {
-                  println("->Unable to connect.  No hostname")
+                val cmd:Array[String] = h.split(" ")
+                if(cmd.size!= 6) {
+                  println("->Unable to connect.  Missing parameters")
                 } else {
-                  val host = h.substring(WEBCONNECT.length + 1, h.length)
+                  val host = cmd(1)
+                  val uid = cmd(2).toLong
+                  val name = cmd(3)
+                  val domainId = cmd(4).toLong
+                  val groupId = cmd(5).toLong
                   println("Connecting to " + host)
-                  wc = Some(new WebClient(host))
+                  wc = Some(new WebClient(host, uid, name, domainId, groupId))
                   wc.map(_.login)
                 }
             }
@@ -335,7 +345,7 @@ object AudioClient {
             } yield {
               val host = li.hostInfo.name
               val port = li.hostInfo.port
-              runclient(host, port)
+              runclient(host, port, Some(li))
               println(s"Connecting to server....${host}:${port}")
               Unit
             }
@@ -352,23 +362,27 @@ object AudioClient {
     }
   }
 
-  def capture = {
-    val c = new Capture(None);
-    val f1 = Future(c.runIt)
-    val f2 = Future(c.haltAfter(10*1000))
+  def handshake(loginInfo:LoginInfo, socket:Socket) = {
+    val out = socket.getOutputStream()
+    val in = socket.getInputStream()
+    AudioLogin.toStream(loginInfo.toAudioLogin, out)
+    out.flush()
+
+    // wait for ACK
+    println("Awaiting ACK...")
+    val ack = AudioAck.fromStream(in)
+    println("ACK: " + ack.toString)
   }
 
-  def playback = {
-    val p = new Playback(None)
-    Future(p.runIt)
-    Future(p.haltAfter(10*1000))
-    //p.halt = true
-  }
-
-  def runclient(host:String, port:Int):Unit = {
+  def runclient(host:String, port:Int, loginInfo:Option[LoginInfo]):Unit = {
     val socket = Option(connectToServer(
       host, port
     ))
+
+    // perform the handshake if given login info.  Otherwise, send away!
+    if(loginInfo.isDefined && socket.isDefined) {
+      handshake(loginInfo.get, socket.get)
+    }
 
     val c = new Capture(socket)
     val f1 = Future(c.runIt)
@@ -396,7 +410,7 @@ object AudioClient {
     val host = hostAndPort.map(_._1).getOrElse("localhost")
     val port = hostAndPort.map(_._2).getOrElse(55555)
 
-    runclient(host, port)
+    runclient(host, port, None)
   }
 
 

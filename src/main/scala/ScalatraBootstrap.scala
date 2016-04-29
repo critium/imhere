@@ -14,5 +14,7 @@ class ScalatraBootstrap extends LifeCycle  {
 
     AudioServer.relay(None)
     context mount (new together.web.LoginServlet, "/auth/*")
+
+    logger.debug("Scalatra Init complete")
   }
 }

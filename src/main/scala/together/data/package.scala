@@ -3,8 +3,7 @@ package together
 import scala.util._
 import scala.collection.mutable
 
-import java.net.Socket;
-import java.nio.ByteBuffer
+import java.net.Socket
 
 import org.json4s._
 import org.json4s.JsonDSL._
@@ -71,7 +70,11 @@ package object data {
     }}
   }
 
-  case class LoginInfo(hostInfo:HostInfo, view:WebView)
+  case class LoginInfo(hostInfo:HostInfo, view:WebView) {
+    def toAudioLogin = {
+      AudioLogin(view.userId, view.hash)
+    }
+  }
   object LoginInfo {
     type LoginInfoConverter = LoginInfo => JValue
     implicit def loginInfoToJValue:LoginInfoConverter = { s => {
@@ -93,72 +96,43 @@ package object data {
 
 
 
+  case class AudioAck(msg:String)
+  object AudioAck extends StreamAble[AudioAck] {
+    type AudioAckConverter = AudioAck => JValue
+    implicit def audioAckToJValue:AudioAckConverter= { a =>{
+      ("msg"   -> a.msg)
+    }}
+
+    override def fromStream(inputStream:java.io.InputStream):Option[AudioAck] = {
+      _fromStream(inputStream) map ( _.extract[AudioAck] )
+    }
+
+
+    override def toStream(src:AudioAck, out:java.io.OutputStream):Unit = {
+      val json:JValue = src
+      _toStream(json, out)
+    }
+  }
+
   case class AudioLogin(userId:Long, hash:String)
 
-  object AudioLogin {
-    implicit val formats = DefaultFormats
-
-    val packetSize = 64
-    val contentLengthSize = java.lang.Integer.SIZE / java.lang.Byte.SIZE
-
+  object AudioLogin extends StreamAble[AudioLogin] {
     type AudioLoginConverter = AudioLogin => JValue
     implicit def audioLoginToJValue:AudioLoginConverter= { a =>{
       ("userId" -> a.userId ) ~
       ("hash"   -> a.hash)
     }}
 
-    def fromStream(inputStream:java.io.InputStream):Option[AudioLogin] = {
-      val contentLengthInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthSize)
-      inputStream.read(contentLengthInBytes)
-
-      val wrapped:ByteBuffer = ByteBuffer.wrap(contentLengthInBytes)
-      val contentLength:Int = wrapped.getInt();
-
-      val contentLengthInChars = contentLength
-      println(s"RCV: ${contentLength}=${contentLengthInChars}")
-      val contentInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthInChars)
-      inputStream.read(contentInBytes)
-
-      val content = new String(contentInBytes.map(_.toChar))
-
-      println(s"RCV: |${content}|")
-
-      val json:JValue = parse(content)
-
-      Try(json.extract[AudioLogin]) match {
-        case Success(v) => Option(v)
-        case Failure(e) =>
-          e.printStackTrace()
-          None
-      }
+    override def fromStream(inputStream:java.io.InputStream):Option[AudioLogin] = {
+      _fromStream(inputStream) map (_.extract[AudioLogin])
     }
 
-    /**
-     * Must always be a factor of 64 (size of packet content).  If Less than fctr of 64,
-     * Then pad
-     */
-    def toStream(audioLogin:AudioLogin, out:java.io.OutputStream):Unit = {
-      val audioLoginJson:JValue = audioLogin
-      val contentSrc:StringBuilder = new StringBuilder(write(audioLogin))
-      val contentLengthRaw:Int = contentSrc.length
-      val contentLengthSizeRem:Int = packetSize - (contentLengthRaw % packetSize)
 
-      // add the padding
-      val contentLength = contentLengthRaw + contentLengthSizeRem
-      padRight(contentSrc, contentLengthSizeRem)
-      val content = contentSrc.toString
-
-      println(s"SND: ${contentLength}, '${content}(${content.toString.getBytes.size})'")
-
-      out.write(ByteBuffer.allocate(4).putInt(contentLength).array())
-      out.write(content.toString.getBytes)
-      out.flush()
+    override def toStream(src:AudioLogin, out:java.io.OutputStream):Unit = {
+      val json:JValue = src
+      _toStream(json, out)
     }
 
-    def padRight(src:StringBuilder, padNum:Int):Unit = {
-      for(i <- 0 until padNum) {
-        src.append(' ');
-      }
-    }
   }
+
 }

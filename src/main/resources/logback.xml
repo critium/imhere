@@ -11,7 +11,7 @@
     <file>together-api-${AKKA_SYSTEM_ROLE:-default}.current.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
         <!-- daily rollover + 100M max check -->
-        <fileNamePattern>wm-api-${AKKA_SYSTEM_ROLE:-default}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+        <fileNamePattern>together-api-${AKKA_SYSTEM_ROLE:-default}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
         <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
             <maxFileSize>100MB</maxFileSize>
         </timeBasedFileNamingAndTriggeringPolicy>
@@ -26,14 +26,12 @@
   <logger name="scala.slick" level="INFO"/>
   <logger name="org.eclise" level="ERROR"/>"
   <logger name="org.quartz" level="INFO"/>
-  <logger name="com.wealthminder" level="DEBUG"/>
-  <logger name="com.wealthminder.webapi.finance.PortfolioResultsSimulator" level="INFO" />
+  <logger name="together" level="DEBUG"/>
 
 
   <root level="INFO">
     <appender-ref ref="STDOUT" />
     <appender-ref ref="FILE" />
-    <appender-ref ref="ASYNC_SLACK" />
   </root>
 
 

@@ -16,7 +16,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.sun.media.sound._
 
+import org.slf4j.LoggerFactory
+
 object AudioServer {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   var encoding = AudioFormat.Encoding.PCM_SIGNED;
   //val rate = 44000f
   val rate = 18000f
@@ -33,7 +37,7 @@ object AudioServer {
 
 
   def getAudioFormat:AudioFormat = {
-    println("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
+    logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
   }
 
@@ -51,20 +55,24 @@ object AudioServer {
       val serverSocket:ServerSocket = new ServerSocket(port)
 
       Future(while(run) {
-        print("Waiting for a connection on " + port + "...")
+        logger.debug("Waiting for a connection on " + port + "...")
         val socket:Socket = serverSocket.accept();
 
-        println(" accepted:" + socket)
+        logger.debug(" accepted:" + socket)
 
         loginUser(socket)
       })
 
       def loginUser(socket:Socket):Future[Unit] = {
-        println("Added new socket connection: " + socket.getInetAddress.getHostAddress)
+        logger.debug("Added new socket connection: " + socket.getInetAddress.getHostAddress)
         val audioLoginMaybe = AudioLogin.fromStream(socket.getInputStream())
 
         DataService.loginAudioUser(audioLoginMaybe, socket) match {
           case Success(audioLogin) =>
+            val ack = AudioAck("Log In Complete")
+
+            logger.debug("Sending ACK")
+            AudioAck.toStream(ack, socket.getOutputStream)
             handleSocket(audioLogin.userId, socket)
           case Failure(e) => {
             //TODO: handleSocketError();
@@ -78,7 +86,7 @@ object AudioServer {
         * I think i need to repace the future with a true thread
         */
       def handleSocket(userId:Long, socket:Socket):Future[Unit] = Future {
-        println(s"Login Success For: ${userId}/${socket.getInetAddress.getHostAddress}")
+        logger.debug(s"Login Success For: ${userId}/${socket.getInetAddress.getHostAddress}")
 
         //val bufSize = 512*5
         val bufSize = 64*1
@@ -111,7 +119,7 @@ object AudioServer {
             out.flush()
 
           } else {
-            println("no connections. sleeping")
+            logger.debug("no connections. sleeping")
             Thread.sleep(1*1000)
           }
         }
@@ -162,7 +170,7 @@ object AudioServer {
       case 1 => None
       case 2 => Some(args(1))
     }
-    println(args(0) + " " + file)
+    logger.debug(args(0) + " " + file)
     args(0) match {
       case i if i == "r" => relay (file)
     }
