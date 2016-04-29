@@ -40,21 +40,21 @@ TODO:
 
 
 
+#NOTES
 Im going to have to rewrite to java.nio.channels.  to fix my room issue.
-
 
 1. Each person should write to the byte channel.  This byte channel should automatically drain
 if nobody is listening.
 
 1. Need to decide if we use gathering or scattering byte channel.
-1.1 Gathering byte channel means we grab all the available people channels in the room and mix them.
-1.1 Scattering byte channel means that we scatter the audio bytes to the people we want to send to.
+  1. Gathering byte channel means we grab all the available people channels in the room and mix them.
+  1. Scattering byte channel means that we scatter the audio bytes to the people we want to send to.
 
 I think we should go wit the gathering approach.
 1. On connection we register the byte channel and start writing to it.
 1. On each audio view, they should be getting a refernce to that person's byte channel and mix it.
 
 
-OTHERS:
+#OTHERS:
 Use Disruptor ring buffer to get and write to channels
 
