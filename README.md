@@ -7,36 +7,36 @@ http://jspeex.sourceforge.net/
 TODO:
 
 # Very basic POC
-* [√] Split Objects, into playback and capture
-* [√] Test Server-Client Streaming
-* [x] Convert to DataGram (UDP), move to much later on.  this is quite big
-* [√] Create 3rd server, for relaying, and sending audio format
-* [√] Collect n>2 mics
-* [√] set configs
-* [√] mix the sources, run on server
-* [√] Add noise Filtering on capture
+[√] Split Objects, into playback and capture
+[√] Test Server-Client Streaming
+[x] Convert to DataGram (UDP), move to much later on.  this is quite big
+[√] Create 3rd server, for relaying, and sending audio format
+[√] Collect n>2 mics
+[√] set configs
+[√] mix the sources, run on server
+[√] Add noise Filtering on capture
 
 # Conver to channels and use disruptor - will need this because we want to mix on each individual channel.
-* [ ] Convert audio client to channel
-* [ ] Convert audio server to channel
-* [ ] Add magic ring buffer to store byte arrays
+[ ] Convert audio client to channel
+[ ] Convert audio server to channel
+[ ] Add magic ring buffer to store byte arrays
 
 # UI
-* [.] Add Electron UI
-* [.] Add Web Backend to work with UI
-* [.] Add PTT voice breakout
-* [.] Add PTT Room
-* [.] Add Server REsponse on AudioLogin
+[ ] Add Electron UI
+[ ] Add Web Backend to work with UI
+[ ] Add PTT voice breakout
+[ ] Add PTT Room
+[ ] Add Server REsponse on AudioLogin
 
 #POLISH
-* [ ] Add auto leveling on capture?
-* [ ] Convert futures to threads?
-* [ ] add variable quality, resample based on ui
-* [ ] Add Encryption
-* [ ] Add speex
-* [ ] optimize speed
-* [ ] optimize network
-* [ ] cleanup java like code?
+[ ] Add auto leveling on capture?
+[ ] Convert futures to threads?
+[ ] add variable quality, resample based on ui
+[ ] Add Encryption
+[ ] Add speex
+[ ] optimize speed
+[ ] optimize network
+[ ] cleanup java like code?
 
 
 
