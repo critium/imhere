@@ -42,6 +42,8 @@ object AudioClient {
     //val client = new DatagramSocket(port, InetAddress.getByName(serverName))
     val client = new Socket(serverName,port);
 
+    client.setTcpNoDelay(true)
+
     client
   }
 

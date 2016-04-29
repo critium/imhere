@@ -88,6 +88,8 @@ object AudioServer {
       def handleSocket(userId:Long, socket:Socket):Future[Unit] = Future {
         logger.debug(s"Login Success For: ${userId}/${socket.getInetAddress.getHostAddress}")
 
+        socket.setTcpNoDelay(true)
+
         //val bufSize = 512*5
         val bufSize = 64*1
         var bytesRead = 0
