@@ -21,7 +21,7 @@ TODO:
 - [ ] Convert audio server to channel
 - [ ] Add magic ring buffer to store byte arrays
 
-# UI
+# UI - https://github.com/critium/imhere-ui
 - [ ] InProg. Add Electron UI
 - [ ] InProg. Add Web Backend to work with UI
 - [ ] InProg. Add PTT voice breakout
