@@ -89,7 +89,7 @@ package object data {
   case class AudioView(userId:Long, currentRoom:Room, people:List[AudioUser])
 
   case class AudioUser(userId:Long, socket:Socket, volume:Int, hash:String){
-    def streamFctr = normalLevel * volume
+    def streamFctr = volume / normalLevel
   }
 
   case class View(web:WebView, audio:Option[AudioView])
