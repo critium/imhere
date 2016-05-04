@@ -128,15 +128,15 @@ object AudioServer {
 
         var readCt:Int = 0
         view = DataService.getAudioViewForUser(userId)
-        val others:List[AudioUser] = view.people.filter(_.userId != userId)
-        val level = others.size
+        var others:List[AudioUser] = view.people.filter(_.userId != userId)
+        var level = others.size
         def readMultiple() {
-
           if(readCt % bufferBarrier == 0) {
             view = DataService.getAudioViewForUser(userId)
-            val others:List[AudioUser] = view.people.filter(_.userId != userId)
-            val level = others.size
+            others = view.people.filter(_.userId != userId)
+            level = others.size
           }
+
           //view = DataService.getAudioViewForUser(userId)
           if(view.people.size > 1) {
             //val others:List[AudioUser] = view.people.filter(_.userId != userId)

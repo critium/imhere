@@ -311,6 +311,7 @@ object AudioClient {
 
     def run = {
       println(consoleMsg)
+      print(prompt)
       while(running) {
         val command = readLine()
 
