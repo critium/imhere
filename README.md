@@ -58,3 +58,5 @@ I think we should go wit the gathering approach.
 #OTHERS:
 Use Disruptor ring buffer to get and write to channels
 
+webconnect localhost:8080 1 test1 1 1
+webconnect localhost:8080 2 test2 1 1

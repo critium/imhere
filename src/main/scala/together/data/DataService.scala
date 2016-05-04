@@ -3,6 +3,7 @@ package together.data
 import java.net.Socket
 import java.nio.ByteBuffer
 
+import together.util._
 import together.audio.AudioServer._
 import together.audio.AudioServer.RelayServer
 
@@ -38,6 +39,9 @@ object DataService {
 
   // views are rooms and users on the user's perspective
   @volatile private var _views = mutable.Map[Long, View]()
+
+  // all buffers
+  @volatile private var _buffers = mutable.Map[Long, CircularByteBuffer]()
 
   def hash(userId:Long) = "#"
 
@@ -126,6 +130,7 @@ object DataService {
         val pplInLobby = getPeopleInRoomId(user, lobbyRoomId)
 
         _sockets += (audioLogin.userId -> socket)
+        _buffers += (audioLogin.userId -> CircularByteBuffer.newBuf(audioLogin.userId.toInt))
 
         Success(audioLogin)
       case _ => Failure(new IllegalArgumentException("audioLogin is None"))
@@ -141,13 +146,21 @@ object DataService {
     val user = _users(userId)
     val theUsers = getPeopleInRoomId(user, roomId)
     val people:List[AudioUser] = theUsers.flatMap { case (k, u) =>
-      _sockets.get(u.id).map { s =>
-        AudioUser(k, s, 5, u.hash)
+      for {
+        s <- _sockets.get(u.id)
+        buf <- _buffers.get(u.id)
+      } yield {
+        AudioUser(k, s, buf, 5, u.hash)
       }
     }.toList
 
     //HACK!
     AudioView(userId, getRoom(user, roomId).get, people)
+  }
+
+  def getAudioBufForUser(userId:Long):CircularByteBuffer = {
+    val roomId = getRoomIdForUserId(userId)
+    _buffers(userId)
   }
 
 

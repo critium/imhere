@@ -51,8 +51,9 @@ object imhereproject extends Build {
         "ch.qos.logback"    %  "logback-classic"   % "1.1.3"            % "runtime",
         "org.eclipse.jetty" %  "jetty-webapp"      % "9.2.10.v20150310" % "container;compile",
         "javax.servlet"     %  "javax.servlet-api" % "3.1.0"            % "provided",
+        "org.scalaj"        %% "scalaj-http"       % "2.3.0",
+        "com.lmax"          %  "disruptor"         % "3.3.4"
 
-        "org.scalaj"        %% "scalaj-http"       % "2.3.0"
       ),
 
       scalacOptions in Test ++= Seq("-Yrangepos")

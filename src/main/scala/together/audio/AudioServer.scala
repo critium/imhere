@@ -21,21 +21,6 @@ import org.slf4j.LoggerFactory
 object AudioServer {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  var encoding = AudioFormat.Encoding.PCM_SIGNED;
-  //val rate = 44000f
-  val rate = 18000f
-  val sampleSize = 16
-  val bigEndian = true
-  val channels = 1
-
-
-  // for bandpass
-  val voiceLow = 300f
-  val voiceHigh = 3000f
-  val voiceResonance = (voiceLow + voiceHigh) / 2
-  val voiceFrequency = voiceHigh - voiceLow
-
-
   def getAudioFormat:AudioFormat = {
     logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
@@ -90,27 +75,29 @@ object AudioServer {
 
         socket.setTcpNoDelay(true)
 
-        //val bufSize = 512*5
-        val bufSize = 64*1
         var bytesRead = 0
 
         // Pipe output to all connections
         val out = socket.getOutputStream()
 
-        while(true) {
+        // baseline audio (nothing)
+        val baseline = Array.ofDim[Byte](bufferLengthInBytes)
+        val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
+
+        def handleSingle() = {
           val view= DataService.getAudioViewForUser(userId)
           if(view.people.size > 1) {
             val others:List[AudioUser] = view.people.filter(_.userId != userId)
 
             val level = others.size
-            val baseline = Array.ofDim[Byte](bufSize)
             var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
-              val readBytes = Array.ofDim[Byte](bufSize)
+              //val readBytes = Array.ofDim[Byte](bufSize)
               val byteCt= c.socket.getInputStream().read(readBytes)
               if(byteCt == -1) {
                 l
               } else {
-                for(i <- 0 until bufSize) {
+                for(i <- 0 until bufferLengthInBytes) {
+                  //logger.debug("FCTR: " + c.streamFctr)
                   l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
                 }
                 l
@@ -125,8 +112,74 @@ object AudioServer {
             Thread.sleep(1*1000)
           }
         }
+
+        var view = DataService.getAudioViewForUser(userId)
+        val aUser:Option[AudioUser] = view.people.find(_.userId == userId)
+        def writeMultiple() = {
+          val byteCt = socket.getInputStream().read(readBytes)
+          val buf = if(byteCt == -1) {
+            baseline
+          } else {
+            readBytes
+          }
+
+          aUser.map (_.buf.write(buf))
+        }
+
+        var readCt:Int = 0
+        view = DataService.getAudioViewForUser(userId)
+        val others:List[AudioUser] = view.people.filter(_.userId != userId)
+        val level = others.size
+        def readMultiple() {
+
+          if(readCt % bufferBarrier == 0) {
+            view = DataService.getAudioViewForUser(userId)
+            val others:List[AudioUser] = view.people.filter(_.userId != userId)
+            val level = others.size
+          }
+          //view = DataService.getAudioViewForUser(userId)
+          if(view.people.size > 1) {
+            //val others:List[AudioUser] = view.people.filter(_.userId != userId)
+
+            //val level = others.size
+            var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
+              val thisStream = c.buf.read(readCt)
+              if(java.util.Arrays.equals(thisStream,baseline)) {
+                l
+                //l(i) = ((l(i) / level).toInt).toByte
+              } else {
+                for(i <- 0 until bufferLengthInBytes) {
+                  l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                }
+                l
+              }
+            }
+            //print('.')
+            out.write(sumStreams)
+            out.flush()
+            readCt = (readCt + 1) % bufferLengthInBytes
+
+          } else {
+            logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
+            Thread.sleep(1*1000)
+          }
+        }
+
+        /**
+         * This is too slow
+         */
+        def handleMultiple() = {
+          writeMultiple()
+          readMultiple()
+        }
+
+        while(true) {
+          //handleSingle()
+          handleMultiple()
+        }
       }
     }
+
 
     def applyFctr(ad: Array[Byte], fctr:Float):Unit = {
       var i = 0

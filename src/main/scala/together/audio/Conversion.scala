@@ -45,6 +45,22 @@ object Conversions {
     ByteBuffer.wrap(bytes).getDouble()
   }
 
+  val zeroByte:Byte = 0x00000000
+  def checksum(data:Array[Byte]):String= {
+    printBinary(
+      data.foldLeft(zeroByte){ (l:Byte,r:Byte) => (l ^ r).toByte }
+    )
+  }
+
+  def printBinary(data:Byte):String = {
+    javax.xml.bind.DatatypeConverter.printHexBinary(Array(data))
+  }
+
+  //def printBinary(data:Array[Byte]):String = {
+    //javax.xml.bind.DatatypeConverter.printHexBinary(data)
+  //}
+
+
   //def toDoubleArray(bytes:Array[Byte]):Array[Double] = {
     //val db = ByteBuffer.wrap(bytes).asDoubleBuffer()
     //db.hasArray()

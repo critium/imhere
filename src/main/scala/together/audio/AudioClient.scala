@@ -21,17 +21,6 @@ import org.slf4j.LoggerFactory
 object AudioClient {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  var encoding = AudioFormat.Encoding.PCM_SIGNED;
-  val rate = 18000f
-  val sampleSize = 16
-  val bigEndian = true
-  val channels = 1
-
-  val voiceLow = 300f
-  val voiceHigh = 3000f
-  val voiceResonance = (voiceLow + voiceHigh) / 2
-  val voiceFrequency = voiceHigh - voiceLow
-
   def getAudioFormat:AudioFormat = {
     println("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
@@ -98,10 +87,7 @@ object AudioClient {
 
       // play back the captured audio data
       val out = getOut
-      val frameSizeInBytes = format.getFrameSize();
-      //val bufferLengthInFrames = line.getBufferSize() / 8;
-      //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
-      val bufferLengthInBytes = 64
+
       val sbuffer:SoftAudioBuffer  = new SoftAudioBuffer(bufferLengthInBytes / Conversions.timesShort, format)
       val filter:SoftFilter = new SoftFilter(format.getSampleRate())
       filter.setFilterType(SoftFilter.FILTERTYPE_BP12);
@@ -114,11 +100,12 @@ object AudioClient {
 
       line.start();
 
-      //val kernel = Conversions.bandPassKernel(bufferLengthInBytes / Conversions.timesShort, 300 / (ServerStream.rate/2) , 3000d / (ServerStream.rate/2))
-
       // we use short bc we have encoded in 16 bit
+      // switched to float so we can use the bandpass
       val floatBuf:Array[Float] = Array.ofDim[Float](bufferLengthInBytes / timesShort)
 
+      val pauseCtr = 100
+      @volatile var ctr = 0
       while (!halt) {
         //print("out:")
         numBytesRead = line.read(data, 0, bufferLengthInBytes)
@@ -138,8 +125,16 @@ object AudioClient {
 
         sbuffer.get(data, 0)
 
+        println("Sending: " + Conversions.checksum(data))
+
         out.write(data, 0, numBytesRead);
         out.flush()
+
+        if(pauseCtr < ctr) {
+          Thread.sleep(60000)
+        } else {
+          ctr = ctr + 1
+        }
       }
 
       // we reached the end of the stream.  stop and close the line.
@@ -183,7 +178,7 @@ object AudioClient {
       var line:SourceDataLine = null
 
       val format = getAudioFormat;
-      val frameSizeInBytes = format.getFrameSize();
+      //val frameSizeInBytes = format.getFrameSize();
 
       val fileStream = getIn
       val info = new DataLine.Info(classOf[SourceDataLine], format);
@@ -198,7 +193,6 @@ object AudioClient {
 
       //val bufferLengthInFrames = line.getBufferSize() / 8;
       //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
-      val bufferLengthInBytes = 64
       val data = Array.ofDim[Byte]( bufferLengthInBytes );
       var numBytesRead = 0;
 
@@ -307,11 +301,13 @@ object AudioClient {
 
     var consoleMsg = """
     Commands are (yes, it is case sensitive):
-      halt                                    - stop this server
-      webconnect <hostname> <uid> <did> <gid> - connect to web server
-      audioconnect                            - connect to audio server
-      disconnect                              - disconnect to both audio and webserver
+      halt                                            - stop this server
+      webconnect <hostname> <uid> <uname> <did> <gid> - connect to web server
+      audioconnect                                    - connect to audio server
+      disconnect                                      - disconnect to both audio and webserver
     """
+
+    var prompt = "=> "
 
     def run = {
       println(consoleMsg)
@@ -327,17 +323,27 @@ object AudioClient {
                 println("Already connected. Disconnect first")
               case _ =>
                 val cmd:Array[String] = h.split(" ")
-                if(cmd.size!= 6) {
-                  println("->Unable to connect.  Missing parameters")
-                } else {
-                  val host = cmd(1)
-                  val uid = cmd(2).toLong
-                  val name = cmd(3)
-                  val domainId = cmd(4).toLong
-                  val groupId = cmd(5).toLong
-                  println("Connecting to " + host)
-                  wc = Some(new WebClient(host, uid, name, domainId, groupId))
-                  wc.map(_.login)
+                cmd.size match {
+                  case i if i == 2 =>
+                    val host = "localhost:8080"
+                    val uid = cmd(1).toLong
+                    val name = s"test${uid}"
+                    val domainId = 1l
+                    val groupId = 1l
+                    println(s"Connecting to ${host} as ${uid}/${name}/${domainId}/${groupId}")
+                    wc = Some(new WebClient(host, uid, name, domainId, groupId))
+                    wc.map(_.login)
+                  case i if i == 6 =>
+                    val host = cmd(1)
+                    val uid = cmd(2).toLong
+                    val name = cmd(3)
+                    val domainId = cmd(4).toLong
+                    val groupId = cmd(5).toLong
+                    println(s"Connecting to ${host} as ${uid}/${name}/${domainId}/${groupId}")
+                    wc = Some(new WebClient(host, uid, name, domainId, groupId))
+                    wc.map(_.login)
+                  case _ =>
+                    println("->Unable to connect.  Missing parameters")
                 }
             }
           case h if h.equals("audioconnect") =>
@@ -360,6 +366,8 @@ object AudioClient {
           case _ =>
             println(consoleMsg)
         }
+
+        print(prompt)
       }
     }
   }

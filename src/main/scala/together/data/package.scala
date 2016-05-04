@@ -1,5 +1,7 @@
 package together
 
+import util._
+
 import scala.util._
 import scala.collection.mutable
 
@@ -88,7 +90,7 @@ package object data {
 
   case class AudioView(userId:Long, currentRoom:Room, people:List[AudioUser])
 
-  case class AudioUser(userId:Long, socket:Socket, volume:Int, hash:String){
+  case class AudioUser(userId:Long, socket:Socket, buf:CircularByteBuffer, volume:Int, hash:String){
     def streamFctr = volume / normalLevel
   }
 
