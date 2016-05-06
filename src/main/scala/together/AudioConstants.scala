@@ -32,5 +32,6 @@ package object audio {
   val byteLen = 8
   //val bufferLengthInBytes = 64
   val bufferLengthInBytes:Int = (rate * .1 * floatLen / byteLen).toInt
-  val bufferBarrier = 10
+  val bufferBarrier = 128 // this is much too large, but lets see
+  val bufferCheck = 10;
 }

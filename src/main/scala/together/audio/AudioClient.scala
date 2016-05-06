@@ -50,7 +50,7 @@ object AudioClient {
 
   }
 
-  class Capture(socket:Option[Socket]) {
+  class Capture(socket:Option[Socket], filename:Option[String]) {
     @volatile var halt = false;
 
     def getOut = {
@@ -58,6 +58,42 @@ object AudioClient {
       socket match {
         case Some(s) => s.getOutputStream()
         case _ => HereServer.getOut(5555)
+      }
+    }
+
+    def runItBlank() = {
+      println("Sending Nothing...")
+      val out = getOut
+
+      while(!halt) {
+        val data = Array.ofDim[Byte]( bufferLengthInBytes )
+        println("Sending: " + Conversions.checksum(data))
+        out.write(data)
+        out.flush()
+
+        Thread.sleep(100)
+
+      }
+    }
+
+    def runItFile(inputFile:String)= {
+      val file = new File(inputFile)
+      val in = new FileInputStream(file)
+      val out = getOut
+      var halt = false
+
+      println("Running the file: " + inputFile + " " + file.exists())
+      while(!halt) {
+        val data = Array.ofDim[Byte]( bufferLengthInBytes )
+        val readCt = in.read(data)
+        println("Sending: " + Conversions.checksum(data))
+        out.write(data)
+        out.flush()
+
+        if(readCt == -1) {
+          halt = true
+        }
+
       }
     }
 
@@ -88,7 +124,7 @@ object AudioClient {
       // play back the captured audio data
       val out = getOut
 
-      val sbuffer:SoftAudioBuffer  = new SoftAudioBuffer(bufferLengthInBytes / Conversions.timesShort, format)
+      val sbuffer:SoftAudioBuffer = new SoftAudioBuffer(bufferLengthInBytes / Conversions.timesShort, format)
       val filter:SoftFilter = new SoftFilter(format.getSampleRate())
       filter.setFilterType(SoftFilter.FILTERTYPE_BP12);
       filter.setResonance(voiceResonance);
@@ -159,23 +195,21 @@ object AudioClient {
     }
   }
 
-  class Playback(socket:Option[Socket]) {
+  class Playback(socket:Option[Socket], file:Option[String] = None) {
     @volatile var pwait = true;
 
-    //var bufSize = 16384;
-    var bufSize = 512*1
     def getIn = {
       //val file = new File("/tmp/test.pcm")
       //new FileInputStream(file)
-      socket match {
-        case Some(s) => s.getInputStream()
-        case _ => HereServer.getIn("localhost", 5555)
+      (file, socket) match {
+        case (Some(f), _)    => new FileInputStream(f)
+        case (None, Some(s)) => s.getInputStream()
+        case _               => HereServer.getIn("localhost", 5555)
       }
-
     }
 
     def runIt = {
-      var line:SourceDataLine = null
+      //var line:SourceDataLine = null
 
       val format = getAudioFormat;
       //val frameSizeInBytes = format.getFrameSize();
@@ -188,8 +222,8 @@ object AudioClient {
       }
 
       println("INFO: " + info);
-      line = AudioSystem.getLine(info).asInstanceOf[SourceDataLine]
-      line.open(format, bufSize);
+      val line:SourceDataLine = AudioSystem.getLine(info).asInstanceOf[SourceDataLine]
+      line.open(format, bufferLengthInBytes);
 
       //val bufferLengthInFrames = line.getBufferSize() / 8;
       //val bufferLengthInBytes = bufferLengthInFrames * frameSizeInBytes;
@@ -225,10 +259,12 @@ object AudioClient {
           if (numBytesRead == -1) {
             keeprunning = false
           } else {
-            var numBytesRemaining = numBytesRead;
-            while (numBytesRemaining > 0 ) {
-              numBytesRemaining -= line.write(data, 0, numBytesRemaining);
-            }
+            //var numBytesRemaining = numBytesRead;
+            //while (numBytesRemaining > 0 ) {
+              println("Receiving: " + Conversions.checksum(data))
+              //numBytesRemaining -= line.write(data, 0, numBytesRemaining);
+              line.write(data, 0, numBytesRead)
+            //}
           }
         }
       }
@@ -240,7 +276,7 @@ object AudioClient {
       line.drain();
       line.stop();
       line.close();
-      line = null;
+      //line = null;
     }
 
     def haltAfter(ms:Long) = {
@@ -303,7 +339,7 @@ object AudioClient {
     Commands are (yes, it is case sensitive):
       halt                                            - stop this server
       webconnect <hostname> <uid> <uname> <did> <gid> - connect to web server
-      audioconnect                                    - connect to audio server
+      audioconnect <filename (optional)>              - connect to audio server
       disconnect                                      - disconnect to both audio and webserver
     """
 
@@ -347,14 +383,28 @@ object AudioClient {
                     println("->Unable to connect.  Missing parameters")
                 }
             }
-          case h if h.equals("audioconnect") =>
+          case h if h.startsWith("audioconnect") =>
+            val cmd:Array[String] = h.split(" ")
+
+            val (filename:Option[String], blank:Boolean)= cmd.size match {
+              case i if i == 2 =>
+                if(cmd(1).equals("blank")) {
+                  (None, true)
+                } else {
+                  println(s"Sending audio from ${cmd(1)}")
+                  (Some(cmd(1)), false)
+                }
+              case _ => (None, false)
+            }
+
+
             val res = for {
               wc <- wc
               li <- wc.loginInfo
             } yield {
               val host = li.hostInfo.name
               val port = li.hostInfo.port
-              runclient(host, port, Some(li))
+              runclient(host, port, Some(li), filename, blank)
               println(s"Connecting to server....${host}:${port}")
               Unit
             }
@@ -365,6 +415,7 @@ object AudioClient {
           case h if h.equals("disconnect") =>
             println("not yet implemented")
           case _ =>
+            println("Unknown command: " + command)
             println(consoleMsg)
         }
 
@@ -385,7 +436,7 @@ object AudioClient {
     println("ACK: " + ack.toString)
   }
 
-  def runclient(host:String, port:Int, loginInfo:Option[LoginInfo]):Unit = {
+  def runclient(host:String, port:Int, loginInfo:Option[LoginInfo], fileName:Option[String], blank:Boolean):Unit = {
     val socket = Option(connectToServer(
       host, port
     ))
@@ -395,8 +446,12 @@ object AudioClient {
       handshake(loginInfo.get, socket.get)
     }
 
-    val c = new Capture(socket)
-    val f1 = Future(c.runIt)
+    val c = new Capture(socket, fileName)
+    val f1 = (blank, fileName) match {
+      case (true, _) => Future(c.runItBlank())
+      case (false, Some(f)) => Future(c.runItFile(f))
+      case (false, None) => Future(c.runIt)
+    }
 
     val p = new Playback(socket)
     Future(p.runIt)
@@ -421,7 +476,7 @@ object AudioClient {
     val host = hostAndPort.map(_._1).getOrElse("localhost")
     val port = hostAndPort.map(_._2).getOrElse(55555)
 
-    runclient(host, port, None)
+    runclient(host, port, None, None, false)
   }
 
 

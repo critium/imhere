@@ -98,7 +98,9 @@ object AudioServer {
               } else {
                 for(i <- 0 until bufferLengthInBytes) {
                   //logger.debug("FCTR: " + c.streamFctr)
-                  l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                  //l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                  // Having issues with echo.  Lets just send the raw data
+                  l(i) = readBytes(i)
                 }
                 l
               }
@@ -113,7 +115,7 @@ object AudioServer {
           }
         }
 
-        var view = DataService.getAudioViewForUser(userId)
+        var view:AudioView = DataService.getAudioViewForUser(userId)
         val aUser:Option[AudioUser] = view.people.find(_.userId == userId)
         def writeMultiple() = {
           val byteCt = socket.getInputStream().read(readBytes)
@@ -129,11 +131,14 @@ object AudioServer {
         var readCt:Int = 0
         view = DataService.getAudioViewForUser(userId)
         var others:List[AudioUser] = view.people.filter(_.userId != userId)
+        // register here
+        others.map { _.buf.register(view.userId)}
         var level = others.size
         def readMultiple() {
-          if(readCt % bufferBarrier == 0) {
+          if(readCt % bufferCheck == 0) {
             view = DataService.getAudioViewForUser(userId)
             others = view.people.filter(_.userId != userId)
+            // register ehre
             level = others.size
           }
 
@@ -143,13 +148,15 @@ object AudioServer {
 
             //val level = others.size
             var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
-              val thisStream = c.buf.read(readCt)
+              val thisStream = c.buf.read(userId)
               if(java.util.Arrays.equals(thisStream,baseline)) {
                 l
                 //l(i) = ((l(i) / level).toInt).toByte
               } else {
                 for(i <- 0 until bufferLengthInBytes) {
-                  l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                  //l(i) = (l(i) + (((readBytes(i) / level)) * (c.streamFctr)).toInt).toByte
+                  // Having issues with echo.  Lets just send the raw data
+                  l(i) = thisStream(i)
                 }
                 l
               }

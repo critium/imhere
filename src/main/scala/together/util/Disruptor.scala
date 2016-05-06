@@ -2,6 +2,7 @@ package together.util
 
 import java.nio._
 import together.audio._
+import scala.collection.mutable
 
 //import com.lmax.disruptor.dsl.Disruptor
 //import java.util.concurrent.Executors
@@ -54,6 +55,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
   //@volatile private var buffer = Array.ofDim[ByteBuffer]( size )
   private var buffer = Array.ofDim[Byte]( size * bufSize)
   private var writePos:Int = 0
+  private var readers = mutable.Map[Long,Int]()
 
   /**
    * Allocates the direct byte buffers
@@ -65,6 +67,18 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     //}
   }
 
+  def register(userId:Long):Unit = {
+    if(! readers.get(userId).isDefined) {
+      val startPos = if(writePos <= 0) {
+        0
+      } else {
+        writePos - 1
+      }
+      readers += (userId -> startPos)
+
+      println(marker.toString + ":s: registering at " + startPos)
+    }
+  }
 
   /**
    * No synchronization.  Allow for a dirty read and a dirty write this is because
@@ -75,6 +89,22 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
 
     //buffer(writePos).put(raw)
     val pos = writePos * bufSize
+
+    val minReader = readers.values.foldLeft(java.lang.Integer.MAX_VALUE)( (l:Int,r:Int) => if(l < r) {
+      l
+    } else {
+      r
+    })
+
+    //if(readers.size > 0) {
+      //print(":m" + marker.toString + ":" + minReader)
+      //// this is too agressivly locking
+      //while(writePos <= minReader) {
+        //print(":wlck:" + marker.toString)
+        //Thread.sleep(100)
+      //}
+    //}
+
     java.lang.System.arraycopy(raw, 0, buffer, pos, bufSize)
     writePos = (writePos + 1) % size
 
@@ -84,13 +114,24 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
   /**
    * No locks!  Allow for dirty reads
    */
-  def read(srcPos:Int):Array[Byte]= {
-    val pos = srcPos % size
+  def read(userId:Long):Array[Byte]= {
+    val pos:Int = readers(userId)
     //val res = buffer(pos).array()
 
-    val bufPos = pos * bufSize
+    println(marker.toString + ":r: " + pos)
+
+    while(pos >= writePos) {
+      print(marker.toString + ":rlck:")
+      Thread.sleep(100)
+    }
+    //if(marker == 1) println(marker.toString + ":r: unlocked")
+
+    val bufPos = (pos % size) * bufSize
     val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)
-    println(marker.toString + ":r: " + pos + " " + Conversions.checksum(res))
+
+    println(marker.toString + ":" + Conversions.checksum(res))
+
+    readers += (userId -> (pos + 1))
 
     res
   }
