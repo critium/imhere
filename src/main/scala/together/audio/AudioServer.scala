@@ -139,6 +139,7 @@ object AudioServer {
             view = DataService.getAudioViewForUser(userId)
             others = view.people.filter(_.userId != userId)
             // register ehre
+            others.map { _.buf.register(view.userId) }
             level = others.size
           }
 
@@ -164,7 +165,7 @@ object AudioServer {
             //print('.')
             out.write(sumStreams)
             out.flush()
-            readCt = (readCt + 1) % bufferLengthInBytes
+            readCt = readCt + 1
 
           } else {
             logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
@@ -181,8 +182,9 @@ object AudioServer {
         }
 
         while(true) {
-          //handleSingle()
-          handleMultiple()
+          handleSingle()
+          // Handle multiple is broken on this version
+          //handleMultiple()
         }
       }
     }

@@ -43,6 +43,8 @@ object DataService {
   // all buffers
   @volatile private var _buffers = mutable.Map[Long, CircularByteBuffer]()
 
+  private var _server:Option[AudioServerInfo] = None
+
   def hash(userId:Long) = "#"
 
   /**
@@ -112,7 +114,8 @@ object DataService {
    * Hardcoded for now...
    */
   def getHostInfo(user:User):HostInfo = {
-    HostInfo(1, RelayServer.ip, RelayServer.host, RelayServer.port)
+    var server = _server.getOrElse(AudioServerInfo("", "", 0))
+    HostInfo(1, server.ip, server.host, server.port)
   }
 
   /**
@@ -161,6 +164,10 @@ object DataService {
   def getAudioBufForUser(userId:Long):CircularByteBuffer = {
     val roomId = getRoomIdForUserId(userId)
     _buffers(userId)
+  }
+
+  def registerServer(audioServer:AudioServerInfo):Unit = {
+    _server = Some(audioServer)
   }
 
 
@@ -230,4 +237,5 @@ trait StreamAble[T] {
       src.append(' ');
     }
   }
+
 }

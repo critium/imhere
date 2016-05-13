@@ -12,7 +12,7 @@ class ScalatraBootstrap extends LifeCycle  {
   override def init(context: ServletContext) {
     // Mount our servlets as normal:
 
-    AudioServer.relay(None)
+    AudioServerMult.relay(None)
     context mount (new together.web.LoginServlet, "/auth/*")
 
     logger.debug("Scalatra Init complete")

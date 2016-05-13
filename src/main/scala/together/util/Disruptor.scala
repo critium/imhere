@@ -76,7 +76,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
       }
       readers += (userId -> startPos)
 
-      println(marker.toString + ":s: registering at " + startPos)
+      println(":" + marker.toString + ":s: registering at " + startPos)
     }
   }
 
@@ -85,7 +85,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
    * we expect only 1 thread to write at a time
    */
   def write(raw:Array[Byte]):Unit = {
-    print(marker.toString + ":w: " + writePos)
+    print(marker.toString + ":w:" + writePos)
 
     //buffer(writePos).put(raw)
     val pos = writePos * bufSize
@@ -108,7 +108,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     java.lang.System.arraycopy(raw, 0, buffer, pos, bufSize)
     writePos = (writePos + 1) % size
 
-    println(" " + Conversions.checksum(raw))
+    println(":"+marker.toString + ":" + Conversions.checksum(raw))
   }
 
   /**
@@ -118,18 +118,18 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     val pos:Int = readers(userId)
     //val res = buffer(pos).array()
 
-    println(marker.toString + ":r: " + pos)
+    print(marker.toString + ":r:" + pos)
 
-    while(pos >= writePos) {
-      print(marker.toString + ":rlck:")
-      Thread.sleep(100)
-    }
+    //while(pos >= writePos) {
+      //print(marker.toString + ":rlck:")
+      //Thread.`yield`
+    //}
     //if(marker == 1) println(marker.toString + ":r: unlocked")
 
     val bufPos = (pos % size) * bufSize
     val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)
 
-    println(marker.toString + ":" + Conversions.checksum(res))
+    println(":" + marker.toString + ":" + Conversions.checksum(res))
 
     readers += (userId -> (pos + 1))
 

@@ -137,4 +137,5 @@ package object data {
 
   }
 
+  case class AudioServerInfo(ip:String, host:String, port:Int)
 }
