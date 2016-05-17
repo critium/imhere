@@ -50,11 +50,16 @@ object CircularByteBuffer {
 
 /**
  * 1. I think bytebuffer is not helping me here
+ * TODO: I think there is a problem with my reader spot.  There is a lot of empty sound before i hear anything
+ *       FIX: i think i need to auto-advance the reader position to the next non-zero bufer block
+ * TODO: Also, the other problem is that once the writer stops writing, the reader gleefully continues on going
+ *       around the buffer and doesnt stop at the barrier
+ *       FIX: I thnk i need to implement a writer block
  */
 class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = bufferLengthInBytes) {
   //@volatile private var buffer = Array.ofDim[ByteBuffer]( size )
   private var buffer = Array.ofDim[Byte]( size * bufSize)
-  private var writePos:Int = 0
+  @volatile private var writePos:Int = 0
   private var readers = mutable.Map[Long,Int]()
 
   /**
@@ -120,11 +125,13 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
 
     print(marker.toString + ":r:" + pos)
 
-    //while(pos >= writePos) {
-      //print(marker.toString + ":rlck:")
-      //Thread.`yield`
-    //}
-    //if(marker == 1) println(marker.toString + ":r: unlocked")
+    // not sure this is the best way to do this but here we are
+    while(pos >= writePos) {
+      print(marker.toString + ":rlck:")
+      Thread.`yield`
+      Thread.sleep(50)
+    }
+    if(marker == 1) println(marker.toString + ":r: unlocked")
 
     val bufPos = (pos % size) * bufSize
     val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)

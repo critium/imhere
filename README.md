@@ -17,9 +17,9 @@ TODO:
 - [x] Add noise Filtering on capture
 
 # Conver to channels and use disruptor - will need this because we want to mix on each individual channel.
-- [ ] Convert audio client to channel
-- [ ] Convert audio server to channel
-- [ ] Add magic ring buffer to store byte arrays
+- [?] Convert audio client to channel
+- [?] Convert audio server to channel
+- [x] Add magic ring buffer to store byte arrays
 
 # UI - https://github.com/critium/imhere-ui
 - [ ] InProg. Add Electron UI
@@ -28,7 +28,7 @@ TODO:
 - [ ] InProg. Add PTT Room
 - [ ] InProg. Add Server REsponse on AudioLogin
 
-#POLISH
+# POLISH / Performance
 - [ ] Add auto leveling on capture?
 - [ ] Convert futures to threads?
 - [ ] add variable quality, resample based on ui
@@ -36,7 +36,10 @@ TODO:
 - [ ] Add speex
 - [ ] optimize speed
 - [ ] optimize network
-- [ ] cleanup java like code?
+
+# TESTING
+- [x] Add a way to send raw audio
+- [x] Add a way to shortcut connections
 
 
 
@@ -55,8 +58,11 @@ I think we should go wit the gathering approach.
 1. On each audio view, they should be getting a refernce to that person's byte channel and mix it.
 
 
-#OTHERS:
+# OTHERS:
 Use Disruptor ring buffer to get and write to channels
 
 webconnect localhost:8080 1 test1 1 1
 webconnect localhost:8080 2 test2 1 1
+audioconnect
+audioconnect blank
+audioconnect ../samples/test1.raw
