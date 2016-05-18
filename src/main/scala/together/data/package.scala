@@ -15,6 +15,7 @@ import org.json4s.jackson.Serialization.{read, write}
 
 package object data {
   var lobbyRoomId = 0l;
+  val roomAId = 1l;
   val normalLevel = 5
 
   case class Domain(id:Long)

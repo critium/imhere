@@ -22,14 +22,16 @@ import org.json4s.jackson.Serialization.{read, write}
  * Temporary dataservice for volatile objects.  Should be replaced with cache such as redis/hazelcast/...
  */
 object DataService {
+  private val logger = LoggerFactory.getLogger(getClass)
 
   /**
    * Creates the empty lobby room
    */
   private val lobby = Room(lobbyRoomId, "Lobby", mutable.Map[Long, User]())
+  private val roomA = Room(roomAId, "Room A", mutable.Map[Long, User]())
 
   // all rooms
-  @volatile private var _rooms = mutable.Map[Long, Room](lobbyRoomId -> lobby)
+  @volatile private var _rooms = mutable.Map[Long, Room](lobbyRoomId -> lobby, roomAId -> roomA)
 
   // all users
   @volatile private var _users = mutable.Map[Long, User]()
@@ -75,7 +77,42 @@ object DataService {
     Some(LoginInfo(hostInfo, webView))
   }
 
-  def addPersonToRoom(roomId:Long, user:User):Boolean = {
+  def getUser(userId:Long):Option[User] = _users.get(userId)
+
+  def moveToRoom(roomId:Long, userId:Long):Boolean = {
+    logger.debug(s"moving $userId to $roomId")
+
+    // validate(roomId, userId)
+    val userOpt = getUser(userId)
+
+    userOpt.map { user =>
+      movePersonToRoom(roomId, user)
+    } match {
+      case Some(v) => v
+      case _ => false
+    }
+  }
+
+  private def movePersonToRoom(roomId:Long, user:User):Boolean = {
+    removePersonFromRoom(roomId, user) && addPersonToRoom(roomId, user)
+  }
+
+  private def removePersonFromRoom(roomId:Long, user:User):Boolean = {
+    val roomOpt = getRoom(user, roomId)
+
+    val rVal = roomOpt.map { room =>
+      logger.debug("Before remvoe: " + room.people.size)
+      room.people.remove(roomId)
+      logger.debug("After remvoe: " + room.people.size)
+    }
+
+    rVal match {
+      case Some(_) => true
+      case _ => false
+    }
+  }
+
+  private def addPersonToRoom(roomId:Long, user:User):Boolean = {
     val roomOpt = getRoom(user, roomId)
 
     roomOpt match {
@@ -129,7 +166,7 @@ object DataService {
         // TODO: Can be mis-matched if user changes rooms before audio becomes available
 
         // get the ppl in the lobby
-        val user = _users(audioLogin.userId)
+        val user = getUser(audioLogin.userId).get //hack!
         val pplInLobby = getPeopleInRoomId(user, lobbyRoomId)
 
         _sockets += (audioLogin.userId -> socket)
@@ -146,7 +183,7 @@ object DataService {
 
   def getAudioViewForUser(userId:Long):AudioView = {
     val roomId = getRoomIdForUserId(userId)
-    val user = _users(userId)
+    val user = getUser(userId).get // hack!
     val theUsers = getPeopleInRoomId(user, roomId)
     val people:List[AudioUser] = theUsers.flatMap { case (k, u) =>
       for {
@@ -168,6 +205,13 @@ object DataService {
 
   def registerServer(audioServer:AudioServerInfo):Unit = {
     _server = Some(audioServer)
+  }
+
+  def listRooms(userId:Long):List[WebRoom] = {
+    getUser(userId) match {
+      case Some(user) => getRooms(user).values.map(_.toWebRoom).toList
+      case _ => List[WebRoom]()
+    }
   }
 
 

@@ -295,9 +295,12 @@ object AudioClient {
     import org.json4s.jackson.Serialization
     import org.json4s.jackson.Serialization.{read, write}
 
-    var protocol = "http://"
-    var auth = "/auth"
-    var loginP = s"${auth}/login"
+    val protocol = "http://"
+    val auth = "/auth"
+    val loginP = s"${auth}/login"
+    val userP = "/user"
+    def roomP(roomId:Long) = s"${userP}/${uid}/room/${roomId}"
+    def listRoomP          = s"${userP}/${uid}/rooms"
 
     implicit val formats = DefaultFormats
 
@@ -326,6 +329,25 @@ object AudioClient {
         "not logged in"
       }
     }
+
+    def join(roomId:Long):String = {
+      val url = s"${protocol}${host}${roomP(roomId)}"
+      val request = Http(url).method("PUT").header("content-type", "application/json")
+      val response:HttpResponse[String] = request.asString
+
+      println("  RCV: " + request.toString + " " + response)
+
+      response.toString
+    }
+
+    def listRooms:String = {
+      val url = s"${protocol}${host}${listRoomP}"
+
+      val response: HttpResponse[String] =
+        Http(url).method("GET").header("content-type", "application/json").asString
+
+      response.toString
+    }
   }
 
   class ConsoleClient {
@@ -340,6 +362,10 @@ object AudioClient {
       halt                                            - stop this server
       webconnect <hostname> <uid> <uname> <did> <gid> - connect to web server
       audioconnect <filename (optional)>              - connect to audio server
+      list                                            - lists the rooms
+      join <roomname>                                 - join a room
+      talk <names (optional)>                         - open an active discussion given a list of users.  If no name is given, then the default person used is YOU
+      leave                                           - leaves an active discussion
       disconnect                                      - disconnect to both audio and webserver
     """
 
@@ -412,6 +438,38 @@ object AudioClient {
             if(!res.isDefined) {
               println(s"No Login info to connect to server.")
             }
+          case h if h.startsWith("list") =>
+            if (wc.isDefined) {
+              val client = wc.get
+              val datum = client.listRooms
+              print(datum)
+            } else {
+              println(s"No Login info to connect to server.")
+            }
+          case h if h.startsWith("join") =>
+            val cmd:Array[String] = h.split(" ")
+
+            val roomOpt = cmd.size match {
+              case i if i == 2 =>
+                Some(cmd(1))
+              case _ =>
+                println("Missing arguments to join room")
+                None
+            }
+
+            val res = for {
+              wc <- wc
+              room <- roomOpt
+            } yield {
+              join(room.toLong, wc)
+              println(s"Joining Room....${room}")
+              Unit
+            }
+
+            if(!res.isDefined) {
+              println(s"No Login info to connect to server.")
+            }
+
           case h if h.equals("disconnect") =>
             println("not yet implemented")
           case _ =>
@@ -434,6 +492,10 @@ object AudioClient {
     println("Awaiting ACK...")
     val ack = AudioAck.fromStream(in)
     println("ACK: " + ack.toString)
+  }
+
+  def join(roomId:Long, wc:WebClient):Unit = {
+    wc.join(roomId)
   }
 
   def runclient(host:String, port:Int, loginInfo:Option[LoginInfo], fileName:Option[String], blank:Boolean):Unit = {

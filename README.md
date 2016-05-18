@@ -26,7 +26,7 @@ TODO:
 - [ ] InProg. Add Web Backend to work with UI
 - [ ] InProg. Add PTT voice breakout
 - [ ] InProg. Add PTT Room
-- [ ] InProg. Add Server REsponse on AudioLogin
+- [x] InProg. Add Server REsponse on AudioLogin
 
 # POLISH / Performance
 - [ ] Add auto leveling on capture?
