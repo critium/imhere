@@ -4,8 +4,9 @@ import together.data._
 import together.audio.Conversions._
 
 import java.io._
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net._
+import java.nio._
+import java.nio.channels._
 
 import javax.sound.sampled._
 import javax.sound.sampled.SourceDataLine._
@@ -126,7 +127,6 @@ object AudioServerChannelMult {
     var host = ""
     var ip = ""
 
-
     @volatile var run = true
 
     class Relay(incPort:Int, clientHost:String) {
@@ -135,7 +135,11 @@ object AudioServerChannelMult {
 
       DataService.registerServer(AudioServerInfo(ip, host, port))
 
-      val serverSocket:ServerSocket = new ServerSocket(port)
+      val serverSocketChannel:ServerSocketChannel = ServerSocketChannel.open();
+
+      serverSocketChannel.bind(new InetSocketAddress(port))
+
+      //serverSocketChannel.socket().bind(new InetSocketAddress(9999));
 
       val socketWriter = new SocketWriter()
       val socketReader = new SocketReader()
@@ -148,22 +152,22 @@ object AudioServerChannelMult {
 
       Future(while(run) {
         logger.debug("Waiting for a connection on " + port + " with client host " + host + "...")
-        val socket:Socket = serverSocket.accept();
-        logger.debug(" accepted:" + socket)
-        loginUser(socket)
+        val channel:SocketChannel = serverSocketChannel.accept();
+        logger.debug(" accepted:" + channel)
+        loginUser(channel)
       })
 
-      def loginUser(socket:Socket):Future[Unit] = {
-        logger.debug("Added new socket connection: " + socket.getInetAddress.getHostAddress)
-        val audioLoginMaybe = AudioLogin.fromStream(socket.getInputStream())
+      def loginUser(channel:SocketChannel):Future[Unit] = {
+        logger.debug("Added new socket connection: " + channel.getRemoteAddress)
+        val audioLoginMaybe = AudioLogin.fromChannel(channel)
 
-        DataService.loginAudioUser(audioLoginMaybe, Some(socket), None) match {
+        DataService.loginAudioUser(audioLoginMaybe, None, Some(channel)) match {
           case Success(audioLogin) =>
             val ack = AudioAck("Log In Complete")
 
             logger.debug("Sending ACK")
-            AudioAck.toStream(ack, socket.getOutputStream)
-            handleSocket(audioLogin.userId, socket)
+            AudioAck.toChannel(ack, channel)
+            handleSocket(audioLogin.userId, channel)
           case Failure(e) => {
             //TODO: handleSocketError();
             e.printStackTrace
@@ -175,9 +179,9 @@ object AudioServerChannelMult {
       /**
        * I think i need to repace the future with a true thread
        */
-      def handleSocket(userId:Long, socket:Socket):Future[Unit] = Future {
-        logger.debug(s"Login Success For: ${userId}/${socket.getInetAddress.getHostAddress}")
-        socket.setTcpNoDelay(true)
+      def handleSocket(userId:Long, channel:SocketChannel):Future[Unit] = Future {
+        logger.debug(s"Login Success For: ${userId}/${channel.getRemoteAddress}")
+        channel.setOption[java.lang.Boolean](StandardSocketOptions.TCP_NODELAY, true)
         var view:AudioView = DataService.getAudioViewForUser(userId)
         val aUser:Option[AudioUser] = view.people.find(_.userId == userId)
 

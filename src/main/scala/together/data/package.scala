@@ -116,6 +116,15 @@ package object data {
       val json:JValue = src
       _toStream(json, out)
     }
+
+    override def fromChannel(channel:SocketChannel):Option[AudioAck] = {
+      _fromChannel(channel) map ( _.extract[AudioAck] )
+    }
+
+    override def toChannel(src:AudioAck, channel:SocketChannel):Unit = {
+      val json:JValue = src
+      _toChannel(json, channel)
+    }
   }
 
   case class AudioLogin(userId:Long, hash:String)
@@ -135,6 +144,15 @@ package object data {
     override def toStream(src:AudioLogin, out:java.io.OutputStream):Unit = {
       val json:JValue = src
       _toStream(json, out)
+    }
+
+    override def fromChannel(channel:SocketChannel):Option[AudioLogin] = {
+      _fromChannel(channel) map ( _.extract[AudioLogin] )
+    }
+
+    override def toChannel(src:AudioLogin, channel:SocketChannel):Unit = {
+      val json:JValue = src
+      _toChannel(json, channel)
     }
 
   }
