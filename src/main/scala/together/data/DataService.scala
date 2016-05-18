@@ -2,6 +2,7 @@ package together.data
 
 import java.net.Socket
 import java.nio.ByteBuffer
+import java.nio.channels.SocketChannel
 
 import together.util._
 import together.audio.AudioServer._
@@ -39,15 +40,110 @@ object DataService {
   // all sockets
   @volatile private var _sockets = mutable.Map[Long, Socket]()
 
+  // all channels
+  @volatile private var _channels = mutable.Map[Long, SocketChannel]()
+
   // views are rooms and users on the user's perspective
   @volatile private var _views = mutable.Map[Long, View]()
 
-  // all buffers
+  // all buffers.  this belongs on the audioserver
   @volatile private var _buffers = mutable.Map[Long, CircularByteBuffer]()
 
+  // all servers, prepare for future where this is many
   private var _server:Option[AudioServerInfo] = None
 
+  //////////////// testing implementations only ///////////
+  // MISSING SECURITY
+
   def hash(userId:Long) = "#"
+
+  def getUsers(userId:Long):mutable.Map[Long, User] = _users
+
+  def getUser(userId:Long):Option[User] = _users.get(userId)
+
+  def getViews(userId:Long):mutable.Map[Long, View] = _views
+
+  def getView(userId:Long):Option[View] = _views.get(userId)
+
+  def getRoom(user:User, roomId:Long):Option[Room] = getRooms(user).get(roomId)
+
+  def getRooms(user:User):mutable.Map[Long, Room] = _rooms
+
+  def getServer(user:User):Option[AudioServerInfo] = _server
+
+  def getBuffer(userId:Long):CircularByteBuffer = _buffers(userId)
+
+  def getHostInfo(user:User):HostInfo = {
+    var server = getServer(user).getOrElse(AudioServerInfo("", "", 0))
+    HostInfo(1, server.ip, server.host, server.port)
+  }
+
+  def getRoomIdForUserId(userId:Long):Long = {
+    getView(userId).get.web.currentRoom.id // hack
+  }
+
+  def getAudioBufForUser(userId:Long):CircularByteBuffer = {
+    getBuffer(userId)
+  }
+
+  def registerServer(audioServer:AudioServerInfo):Unit = {
+    _server = Some(audioServer)
+  }
+
+
+
+
+
+  ///////////////// WORKs BUT THIS IS REALLY A DUMMY IMPL ///////////////
+  // NEED TO REMOVE access to the underscore vals before it can graduate
+  def loginAudioUser(audioLogin:Option[AudioLogin], socket:Option[Socket], channel:Option[SocketChannel]):Try[AudioLogin] = {
+    audioLogin match {
+      case Some(audioLogin) =>
+        // TODO: do something with the hash
+        // TODO: Can be mis-matched if user changes rooms before audio becomes available
+
+        // get the ppl in the lobby
+        val user = getUser(audioLogin.userId).get //hack!
+        val pplInLobby = getPeopleInRoomId(user, lobbyRoomId)
+
+        (socket, channel) match {
+          case (Some(socket), _) => _sockets += (audioLogin.userId -> socket)
+          case (_, Some(channel)) => _channels += (audioLogin.userId -> channel)
+          case _ => Unit
+        }
+
+        _buffers += (audioLogin.userId -> CircularByteBuffer.newBuf(audioLogin.userId.toInt))
+
+        Success(audioLogin)
+      case _ => Failure(new IllegalArgumentException("audioLogin is None"))
+    }
+  }
+
+  def getAudioViewForUser(userId:Long):AudioView = {
+    val roomId = getRoomIdForUserId(userId)
+    val user = getUser(userId).get // hack!
+    val theUsers = getPeopleInRoomId(user, roomId)
+    val people:List[AudioUser] = theUsers.flatMap { case (k, u) =>
+      for {
+        buf <- _buffers.get(u.id)
+      } yield {
+        val s = _sockets.get(u.id)
+        val c = _channels.get(u.id)
+        AudioUser(k, s, c, buf, 5, u.hash)
+      }
+    }.toList
+
+    //HACK!
+    AudioView(userId, getRoom(user, roomId).get, people)
+  }
+
+
+
+
+
+
+
+  ///////////////// WORK BEGINS ///////////////
 
   /**
    * Puts a person into the user group and the default room (no room?)
@@ -56,7 +152,7 @@ object DataService {
     //TODO: do some security thing here
 
     // Add the user to the list.
-    _users += (user.id -> user)
+    getUsers(user.id) += (user.id -> user)
 
     // add the person to the lobby
     addPersonToRoom(lobbyRoomId, user)
@@ -68,7 +164,7 @@ object DataService {
     val view = View(webView, None)
 
     // add the view
-    _views += (user.id -> view)
+    getViews(user.id) += (user.id -> view)
 
     // get the ip and host
     val hostInfo = getHostInfo(user)
@@ -77,7 +173,15 @@ object DataService {
     Some(LoginInfo(hostInfo, webView))
   }
 
-  def getUser(userId:Long):Option[User] = _users.get(userId)
+
+  def updateView(userId:Long, view:View):Boolean = {
+    Try(getViews(userId) += (userId -> view)) match {
+      case Success(_) => true
+      case Failure(e) =>
+        e.printStackTrace
+        false
+    }
+  }
 
   def moveToRoom(roomId:Long, userId:Long):Boolean = {
     logger.debug(s"moving $userId to $roomId")
@@ -94,16 +198,37 @@ object DataService {
   }
 
   private def movePersonToRoom(roomId:Long, user:User):Boolean = {
-    removePersonFromRoom(roomId, user) && addPersonToRoom(roomId, user)
+    removePersonFromRoom(roomId, user) && addPersonToRoom(roomId, user) && changeView(roomId, user)
+  }
+
+  private def changeView(roomId:Long, user:User):Boolean = {
+    val res = for {
+      view <- getView(user.id)
+      room <- getRoom(user, roomId)
+    } yield {
+      val webRoom = room.toWebRoom
+      val webC = view.web.copy(currentRoom = webRoom)
+      val audioC = view.audio.map(_.copy(currentRoom = room))
+      val newView = View(webC, audioC)
+
+      updateView(user.id, newView)
+    }
+
+    res match {
+      case Some(v) => v
+      case _ => false
+    }
   }
 
   private def removePersonFromRoom(roomId:Long, user:User):Boolean = {
-    val roomOpt = getRoom(user, roomId)
+    val rooms = getRooms(user)
+
+    val roomOpt = rooms.values.find(_.people.keys.toList.contains(user.id))
 
     val rVal = roomOpt.map { room =>
-      logger.debug("Before remvoe: " + room.people.size)
+      //logger.debug("Before remove: " + room.people.size)
       room.people.remove(roomId)
-      logger.debug("After remvoe: " + room.people.size)
+      //logger.debug("After remove: " + room.people.size)
     }
 
     rVal match {
@@ -134,78 +259,6 @@ object DataService {
     }
   }
 
-  def getRoom(user:User, roomId:Long):Option[Room] = {
-    var rooms:mutable.Map[Long, Room] = getRooms(user)
-
-    rooms.get(roomId)
-  }
-
-  /**
-   * Hardcoded for now...
-   */
-  def getRooms(user:User):mutable.Map[Long, Room] = {
-    _rooms
-  }
-
-  /**
-   * Hardcoded for now...
-   */
-  def getHostInfo(user:User):HostInfo = {
-    var server = _server.getOrElse(AudioServerInfo("", "", 0))
-    HostInfo(1, server.ip, server.host, server.port)
-  }
-
-  /**
-   * Login the user from the audio socket
-   * DUMMY ONLY
-   */
-  def loginAudioUser(audioLogin:Option[AudioLogin], socket:Socket):Try[AudioLogin] = {
-    audioLogin match {
-      case Some(audioLogin) =>
-        // TODO: do something with the hash
-        // TODO: Can be mis-matched if user changes rooms before audio becomes available
-
-        // get the ppl in the lobby
-        val user = getUser(audioLogin.userId).get //hack!
-        val pplInLobby = getPeopleInRoomId(user, lobbyRoomId)
-
-        _sockets += (audioLogin.userId -> socket)
-        _buffers += (audioLogin.userId -> CircularByteBuffer.newBuf(audioLogin.userId.toInt))
-
-        Success(audioLogin)
-      case _ => Failure(new IllegalArgumentException("audioLogin is None"))
-    }
-  }
-
-  def getRoomIdForUserId(userId:Long):Long = {
-    lobbyRoomId
-  }
-
-  def getAudioViewForUser(userId:Long):AudioView = {
-    val roomId = getRoomIdForUserId(userId)
-    val user = getUser(userId).get // hack!
-    val theUsers = getPeopleInRoomId(user, roomId)
-    val people:List[AudioUser] = theUsers.flatMap { case (k, u) =>
-      for {
-        s <- _sockets.get(u.id)
-        buf <- _buffers.get(u.id)
-      } yield {
-        AudioUser(k, s, buf, 5, u.hash)
-      }
-    }.toList
-
-    //HACK!
-    AudioView(userId, getRoom(user, roomId).get, people)
-  }
-
-  def getAudioBufForUser(userId:Long):CircularByteBuffer = {
-    val roomId = getRoomIdForUserId(userId)
-    _buffers(userId)
-  }
-
-  def registerServer(audioServer:AudioServerInfo):Unit = {
-    _server = Some(audioServer)
-  }
 
   def listRooms(userId:Long):List[WebRoom] = {
     getUser(userId) match {

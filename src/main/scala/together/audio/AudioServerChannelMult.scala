@@ -19,11 +19,7 @@ import com.sun.media.sound._
 
 import org.slf4j.LoggerFactory
 
-/**
- * This is the 2nd version. Its coded to use the disruptor and has a single read thread and a separate write thread
- * It is hard coded to use sockets
- */
-object AudioServerMult {
+object AudioServerChannelMult {
   private val logger = LoggerFactory.getLogger(getClass)
 
   def getAudioFormat:AudioFormat = {
@@ -43,7 +39,7 @@ object AudioServerMult {
     }
 
     def writeMultiple(aUser:AudioUser) = {
-      val byteCt = aUser.socket.get.getInputStream().read(readBytes)
+      val byteCt = aUser.socket.map (_.getInputStream().read(readBytes)).getOrElse(-1)
       val buf = if(byteCt == -1) {
         Thread.sleep(1*1000)
         Thread.`yield`
@@ -78,8 +74,10 @@ object AudioServerMult {
       var others:List[AudioUser] = view.people.filter(_.userId != userId)
       others.map { _.buf.register(view.userId)} // register here
       var level = others.size
-      val out = aUser.socket.get.getOutputStream()
-      contexts += SocketReaderContext(userId, view, others, level, readCt, out)
+      aUser.socket.map{s =>
+        val out = s.getOutputStream()
+        contexts += SocketReaderContext(userId, view, others, level, readCt, out)
+      }
     }
 
     def readMultiple(context:SocketReaderContext):Unit = {

@@ -6,6 +6,7 @@ import scala.util._
 import scala.collection.mutable
 
 import java.net.Socket
+import java.nio.channels.SocketChannel
 
 import org.json4s._
 import org.json4s.JsonDSL._
@@ -91,7 +92,7 @@ package object data {
 
   case class AudioView(userId:Long, currentRoom:Room, people:List[AudioUser])
 
-  case class AudioUser(userId:Long, socket:Socket, buf:CircularByteBuffer, volume:Int, hash:String){
+  case class AudioUser(userId:Long, socket:Option[Socket], channel:Option[SocketChannel], buf:CircularByteBuffer, volume:Int, hash:String){
     def streamFctr = volume / normalLevel
   }
 

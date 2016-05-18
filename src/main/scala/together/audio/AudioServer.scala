@@ -18,6 +18,9 @@ import com.sun.media.sound._
 
 import org.slf4j.LoggerFactory
 
+/**
+ * This is the oldest version.  Doesnt support multiple users or the disruptor well and is hardcoded to use sockets
+ */
 object AudioServer {
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -39,6 +42,8 @@ object AudioServer {
 
       val serverSocket:ServerSocket = new ServerSocket(port)
 
+      DataService.registerServer(AudioServerInfo(ip, host, port))
+
       Future(while(run) {
         logger.debug("Waiting for a connection on " + port + "...")
         val socket:Socket = serverSocket.accept();
@@ -52,7 +57,7 @@ object AudioServer {
         logger.debug("Added new socket connection: " + socket.getInetAddress.getHostAddress)
         val audioLoginMaybe = AudioLogin.fromStream(socket.getInputStream())
 
-        DataService.loginAudioUser(audioLoginMaybe, socket) match {
+        DataService.loginAudioUser(audioLoginMaybe, Some(socket), None) match {
           case Success(audioLogin) =>
             val ack = AudioAck("Log In Complete")
 
@@ -92,7 +97,7 @@ object AudioServer {
             val level = others.size
             var sumStreams:Array[Byte] = others.foldLeft(baseline){ ( l,c ) =>
               //val readBytes = Array.ofDim[Byte](bufSize)
-              val byteCt= c.socket.getInputStream().read(readBytes)
+              val byteCt= c.socket.get.getInputStream().read(readBytes)
               if(byteCt == -1) {
                 l
               } else {
