@@ -26,10 +26,7 @@ import org.slf4j.LoggerFactory
 object AudioServerMult {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  def getAudioFormat:AudioFormat = {
-    logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
-    return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
-  }
+  logger.info("STARTING THE MULT SERVER")
 
   // TODO: Check perf differnce with using native byte buffers
   class SocketWriter() extends Runnable {

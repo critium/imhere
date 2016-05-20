@@ -24,10 +24,7 @@ import org.slf4j.LoggerFactory
 object AudioServer {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  def getAudioFormat:AudioFormat = {
-    logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
-    return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
-  }
+  logger.info("STARTING THE DEFAULT")
 
   object RelayServer {
     var port = 0

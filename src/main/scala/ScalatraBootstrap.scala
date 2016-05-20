@@ -11,8 +11,12 @@ class ScalatraBootstrap extends LifeCycle  {
 
   override def init(context: ServletContext) {
     // Mount our servlets as normal:
+    System.getenv("VERSION") match {
+      case i if i.equals("channel") => AudioServerChannelMult.relay(None)
+      case i if i.equals("mult") => AudioServerMult.relay(None)
+      case _ => AudioServer.relay(None)
+    }
 
-    AudioServerMult.relay(None)
     context mount (new together.web.LoginServlet, "/auth/*")
     context mount (new together.web.UserServlet, "/user/*")
 

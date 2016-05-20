@@ -60,6 +60,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
   //@volatile private var buffer = Array.ofDim[ByteBuffer]( size )
   private var buffer = Array.ofDim[Byte]( size * bufSize)
   @volatile private var writePos:Int = 0
+  @volatile private var bufPos:Int = 0
   private var readers = mutable.Map[Long,Int]()
 
   /**
@@ -93,7 +94,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     print(marker.toString + ":w:" + writePos)
 
     //buffer(writePos).put(raw)
-    val pos = writePos * bufSize
+    val pos = bufPos * bufSize
 
     val minReader = readers.values.foldLeft(java.lang.Integer.MAX_VALUE)( (l:Int,r:Int) => if(l < r) {
       l
@@ -111,7 +112,8 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     //}
 
     java.lang.System.arraycopy(raw, 0, buffer, pos, bufSize)
-    writePos = (writePos + 1) % size
+    writePos = writePos + 1
+    bufPos = writePos % size
 
     println(":"+marker.toString + ":" + Conversions.checksum(raw))
   }

@@ -19,7 +19,10 @@ import com.sun.media.sound._
 import org.slf4j.LoggerFactory
 
 package object audio {
+  private val logger = LoggerFactory.getLogger(getClass)
+
   var encoding = AudioFormat.Encoding.PCM_SIGNED;
+  // TODO: Decrease this to 8000
   val rate = 18000f
   val sampleSize = 16
   val bigEndian = true
@@ -31,7 +34,14 @@ package object audio {
   val floatLen = 32;
   val byteLen = 8
   //val bufferLengthInBytes = 64
-  val bufferLengthInBytes:Int = (rate * .1 * floatLen / byteLen).toInt
+  val bufferLengthInSeconds = .1
+  val bufferLengthInBytes:Int = ((rate * bufferLengthInSeconds) * (floatLen / byteLen)).toInt
   val bufferBarrier = 128 // this is much too large, but lets see
   val bufferCheck = 10;
+
+  def getAudioFormat:AudioFormat = {
+    logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
+    return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
+  }
+
 }

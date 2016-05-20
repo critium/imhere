@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 
 import together.util._
+import together.audio.Conversions._
 import together.audio.AudioServer._
 import together.audio.AudioServer.RelayServer
 
@@ -19,7 +20,7 @@ import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, write}
 
-trait StreamAble[T] {
+trait StreamAble[T] extends ChannelSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
   implicit val formats = DefaultFormats
@@ -37,62 +38,25 @@ trait StreamAble[T] {
    */
   def fromChannel(channel:SocketChannel):Option[T] = ???
 
-  protected def readChannel(lengthInBytes:Int, channel:SocketChannel):ByteBuffer = {
-    val buf = ByteBuffer.allocate(lengthInBytes);
-    var clCtr = 0
-
-    while(clCtr < lengthInBytes) {
-      val bytesRead = channel.read(buf);
-      clCtr = clCtr + bytesRead
-    }
-
-    buf
-  }
-
   protected def _fromChannel(channel:SocketChannel):Option[JValue] = {
-    //val contentLengthBuf = readChannel(contentLengthSize, channel)
-
-    //val contentLengthInChars = contentLengthBuf.getInt()
-    //logger.debug(s"RCV: ${contentLength}=${contentLengthInChars}")
-    //val contentBuf = readChannel(contentLengthInChars, channel)
-
-    //val content = new String(contentBuf.toString)
-
-    //logger.debug(s"RCV: |${content}|")
-    //Option(parse(content))
-    def getContentLength = readChannel(contentLengthSize, channel)
+    def getContentLength = {
+      val buf = readChannel(contentLengthSize, channel)
+      buf.getInt(0)
+    }
     def getContent(contentLength:Int):String = {
       val contentBuf = readChannel(contentLength, channel)
-      contentBuf.toString
+      new String(contentBuf.array.map(_.toChar))
     }
 
     fromAny(getContentLength, getContent)
 
   }
 
-  protected def fromAny(getContentLength: => ByteBuffer, getContent:(Int) => String):Option[JValue] = {
-    val contentLengthBuf = getContentLength
-    val contentLengthInChars = contentLengthBuf.getInt()
+  protected def fromAny(getContentLength: => Int , getContent:(Int) => String):Option[JValue] = {
+    val contentLengthInChars= getContentLength
     logger.debug(s"RCV: contentLength=${contentLengthInChars}")
+
     val content = getContent(contentLengthInChars)
-    logger.debug(s"RCV: |${content}|")
-    Option(parse(content))
-  }
-
-  protected def _fromStream(inputStream:java.io.InputStream):Option[JValue] = {
-    val contentLengthInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthSize)
-    inputStream.read(contentLengthInBytes)
-
-    val wrapped:ByteBuffer = ByteBuffer.wrap(contentLengthInBytes)
-    val contentLength:Int = wrapped.getInt();
-
-    val contentLengthInChars = contentLength
-    logger.debug(s"RCV: ${contentLength}=${contentLengthInChars}")
-    val contentInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthInChars)
-    inputStream.read(contentInBytes)
-
-    val content = new String(contentInBytes.map(_.toChar))
-
     logger.debug(s"RCV: |${content}|")
 
     Option(parse(content))
@@ -105,6 +69,25 @@ trait StreamAble[T] {
     //}
   }
 
+  protected def _fromStream(inputStream:java.io.InputStream):Option[JValue] = {
+    def getContentLength = {
+      val contentLengthInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthSize)
+      inputStream.read(contentLengthInBytes)
+      val wrapped:ByteBuffer = ByteBuffer.wrap(contentLengthInBytes)
+      wrapped.getInt(0)
+    }
+
+    def getContent(contentLength:Int):String = {
+      val contentLengthInChars = contentLength
+      logger.debug(s"RCV: ${contentLength}=${contentLengthInChars}")
+      val contentInBytes:Array[Byte] = Array.ofDim[Byte](contentLengthInChars)
+      inputStream.read(contentInBytes)
+      new String(contentInBytes.map(_.toChar))
+    }
+
+    fromAny(getContentLength, getContent)
+  }
+
   /**
    * Must always be a factor of 64 (size of packet content).  If Less than fctr of 64,
    * Then pad
@@ -115,12 +98,6 @@ trait StreamAble[T] {
    * Channel version of toStream
    */
   def toChannel(src:T, channel:SocketChannel):Unit = ???
-
-  protected def writeChannel(buf:ByteBuffer, channel:SocketChannel):Unit = {
-    while(buf.hasRemaining()) {
-      channel.write(buf);
-    }
-  }
 
   protected def dataToStreamable(json:JValue):(Int, String) = {
     val contentSrc:StringBuilder = new StringBuilder(write(json))
@@ -140,8 +117,22 @@ trait StreamAble[T] {
 
     println(s"SND: ${contentLength}, '${content}(${content.toString.getBytes.size})'")
 
-    writeChannel(ByteBuffer.allocate(4).putInt(contentLength), channel)
-    writeChannel(ByteBuffer.wrap(content.toString.getBytes), channel)
+    val countBytes = ByteBuffer.allocate(contentLengthSize).putInt(contentLength).array
+    val contentBytes = content.toString.getBytes
+    val messageInBytes:Array[Byte] = Array.ofDim[Byte](countBytes.size + contentBytes.size)
+
+    System.arraycopy(countBytes   , 0 , messageInBytes , 0               , countBytes.size)
+    System.arraycopy(contentBytes , 0 , messageInBytes , countBytes.size , contentBytes.size)
+
+    val finalBuf = ByteBuffer.wrap(messageInBytes)
+    //val finalBuf = totalBuf.put(countBuf).put(contentBuf, contentLengthSize)
+    //writeChannel(ByteBuffer.allocate(contentLengthSize).putInt(contentLength), channel)
+    //writeChannel(ByteBuffer.wrap(content.toString.getBytes), channel)
+
+    println(s"SND: ${countBytes.map(printBinary(_)).mkString(",")}")
+    //println(s"SND: ${contentBytes.map(printBinary(_)).mkString(",")}")
+    //println(s"SND: ${finalBuf.array.map(printBinary(_)).mkString(",")}")
+    writeChannel(finalBuf, channel)
   }
 
   protected def _toStream(json:JValue, out:java.io.OutputStream):Unit = {
@@ -149,7 +140,7 @@ trait StreamAble[T] {
 
     println(s"SND: ${contentLength}, '${content}(${content.toString.getBytes.size})'")
 
-    out.write(ByteBuffer.allocate(4).putInt(contentLength).array())
+    out.write(ByteBuffer.allocate(contentLengthSize).putInt(contentLength).array())
     out.write(content.toString.getBytes)
     out.flush()
   }

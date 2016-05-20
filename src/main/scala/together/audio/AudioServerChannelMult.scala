@@ -20,36 +20,27 @@ import com.sun.media.sound._
 
 import org.slf4j.LoggerFactory
 
-object AudioServerChannelMult {
+object AudioServerChannelMult extends ChannelSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  def getAudioFormat:AudioFormat = {
-    logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
-    return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);
-  }
+  logger.info("STARTING THE CHANNEL SERVER")
 
   // TODO: Check perf differnce with using native byte buffers
-  class SocketWriter() extends Runnable {
+  class ChannelWriter() extends Runnable {
     var users:mutable.MutableList[AudioUser] = mutable.MutableList[AudioUser]()
 
-    val baseline = Array.ofDim[Byte](bufferLengthInBytes)
-    val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
+    val baseline = ByteBuffer.allocate(bufferLengthInBytes)
+    val readBuf = ByteBuffer.allocate(bufferLengthInBytes)
 
     def addUser(auser:AudioUser):Unit = {
       users += auser
     }
 
     def writeMultiple(aUser:AudioUser) = {
-      val byteCt = aUser.socket.map (_.getInputStream().read(readBytes)).getOrElse(-1)
-      val buf = if(byteCt == -1) {
-        Thread.sleep(1*1000)
-        Thread.`yield`
-        baseline
-      } else {
-        readBytes
-      }
-
-      aUser.buf.write(buf)
+      readChannel(bufferLengthInBytes, aUser.channel.get, Some(readBuf))
+      //val readBuf = readChannel(bufferLengthInBytes, aUser.channel.get)
+      aUser.buf.write(readBuf.array)
+      readBuf.clear()
     }
 
     def run() = {
@@ -59,10 +50,10 @@ object AudioServerChannelMult {
     }
   }
 
-  class SocketReader() extends Runnable {
-    case class SocketReaderContext(userId:Long, var view:AudioView, var others:List[AudioUser], var level:Int, var readCt:Int, out:OutputStream)
+  class ChannelReader() extends Runnable {
+    case class ChannelReaderContext(userId:Long, var view:AudioView, var others:List[AudioUser], var level:Int, var readCt:Int, channel:SocketChannel)
 
-    var contexts:mutable.MutableList[SocketReaderContext] = mutable.MutableList[SocketReaderContext]()
+    var contexts:mutable.MutableList[ChannelReaderContext] = mutable.MutableList[ChannelReaderContext]()
 
     val baseline = Array.ofDim[Byte](bufferLengthInBytes)
     val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
@@ -75,13 +66,12 @@ object AudioServerChannelMult {
       var others:List[AudioUser] = view.people.filter(_.userId != userId)
       others.map { _.buf.register(view.userId)} // register here
       var level = others.size
-      aUser.socket.map{s =>
-        val out = s.getOutputStream()
-        contexts += SocketReaderContext(userId, view, others, level, readCt, out)
+      aUser.channel.map{c =>
+        contexts += ChannelReaderContext(userId, view, others, level, readCt, c)
       }
     }
 
-    def readMultiple(context:SocketReaderContext):Unit = {
+    def readMultiple(context:ChannelReaderContext):Unit = {
       val userId = context.userId
       if(context.readCt % bufferCheck == 0) {
         context.view = DataService.getAudioViewForUser(userId)
@@ -104,8 +94,7 @@ object AudioServerChannelMult {
             l
           }
         }
-        context.out.write(sumStreams)
-        context.out.flush()
+        writeChannel(ByteBuffer.wrap(sumStreams), context.channel)
         context.readCt = context.readCt + 1
 
       } else {
@@ -122,7 +111,7 @@ object AudioServerChannelMult {
     }
   }
 
-  object RelayServerMult {
+  object RelayServerChanMult {
     var port = 0
     var host = ""
     var ip = ""
@@ -141,11 +130,11 @@ object AudioServerChannelMult {
 
       //serverSocketChannel.socket().bind(new InetSocketAddress(9999));
 
-      val socketWriter = new SocketWriter()
-      val socketReader = new SocketReader()
+      val channelWriter = new ChannelWriter()
+      val channelReader = new ChannelReader()
 
-      val wThread = new Thread(socketWriter)
-      val rThread = new Thread(socketReader)
+      val wThread = new Thread(channelWriter)
+      val rThread = new Thread(channelReader)
 
       wThread.start()
       rThread.start()
@@ -160,6 +149,7 @@ object AudioServerChannelMult {
       def loginUser(channel:SocketChannel):Future[Unit] = {
         logger.debug("Added new socket connection: " + channel.getRemoteAddress)
         val audioLoginMaybe = AudioLogin.fromChannel(channel)
+        logger.debug("Login?: " + audioLoginMaybe)
 
         DataService.loginAudioUser(audioLoginMaybe, None, Some(channel)) match {
           case Success(audioLogin) =>
@@ -186,8 +176,8 @@ object AudioServerChannelMult {
         val aUser:Option[AudioUser] = view.people.find(_.userId == userId)
 
         aUser.foreach { aUser =>
-          socketWriter.addUser(aUser)
-          socketReader.addUser(aUser)
+          channelWriter.addUser(aUser)
+          channelReader.addUser(aUser)
         }
       }
 
@@ -198,17 +188,17 @@ object AudioServerChannelMult {
 
   def relay(file:Option[String]) = {
     val prop = new java.util.Properties()
-    val r:Option[RelayServerMult.Relay] = for {
+    val r:Option[RelayServerChanMult.Relay] = for {
       propFileName <- file
       load <- Option(prop.load(new java.io.FileReader(propFileName)))
       port <- Option(prop.getProperty("listen"))
       host <- Option(prop.getProperty("hostname"))
     } yield {
       val portAsInt = port.toInt
-      new RelayServerMult.Relay(portAsInt, host)
+      new RelayServerChanMult.Relay(portAsInt, host)
     }
 
-    r.getOrElse(new RelayServerMult.Relay(55555, "localhost"))
+    r.getOrElse(new RelayServerChanMult.Relay(55555, "localhost"))
   }
 
   def main (args:Array[String]):Unit = {

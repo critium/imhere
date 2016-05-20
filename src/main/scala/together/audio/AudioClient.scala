@@ -71,6 +71,7 @@ object AudioClient {
         out.write(data)
         out.flush()
 
+        Thread.`yield`
         Thread.sleep(100)
 
       }
@@ -89,6 +90,9 @@ object AudioClient {
         println("Sending: " + Conversions.checksum(data))
         out.write(data)
         out.flush()
+
+        Thread.`yield`
+        Thread.sleep(100)
 
         if(readCt == -1) {
           halt = true
