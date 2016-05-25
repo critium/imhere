@@ -16,10 +16,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.sun.media.sound._
 
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
+import org.json4s.jackson.Serialization
+import org.json4s.jackson.Serialization.{read, write}
+
 import org.slf4j.LoggerFactory
 
 object AudioClient {
   private val logger = LoggerFactory.getLogger(getClass)
+  private val sLogger = LoggerFactory.getLogger("sender")
+  private val rLogger = LoggerFactory.getLogger("receiver")
 
   def getAudioFormat:AudioFormat = {
     println("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
@@ -62,12 +70,12 @@ object AudioClient {
     }
 
     def runItBlank() = {
-      println("Sending Nothing...")
+      sLogger.debug("Sending Nothing...")
       val out = getOut
 
       while(!halt) {
         val data = Array.ofDim[Byte]( bufferLengthInBytes )
-        println("Sending: " + Conversions.checksum(data))
+        sLogger.debug("Sending: " + Conversions.checksum(data))
         out.write(data)
         out.flush()
 
@@ -87,7 +95,7 @@ object AudioClient {
       while(!halt) {
         val data = Array.ofDim[Byte]( bufferLengthInBytes )
         val readCt = in.read(data)
-        println("Sending: " + Conversions.checksum(data))
+        sLogger.debug("Sending: " + Conversions.checksum(data))
         out.write(data)
         out.flush()
 
@@ -165,7 +173,7 @@ object AudioClient {
 
         sbuffer.get(data, 0)
 
-        println("Sending: " + Conversions.checksum(data))
+        sLogger.debug("Sending: " + Conversions.checksum(data))
 
         out.write(data, 0, numBytesRead);
         out.flush()
@@ -265,7 +273,7 @@ object AudioClient {
           } else {
             //var numBytesRemaining = numBytesRead;
             //while (numBytesRemaining > 0 ) {
-              println("Receiving: " + Conversions.checksum(data))
+              rLogger.debug("Receiving: " + Conversions.checksum(data))
               //numBytesRemaining -= line.write(data, 0, numBytesRemaining);
               line.write(data, 0, numBytesRead)
             //}
@@ -293,11 +301,6 @@ object AudioClient {
   class WebClient(host:String, uid:Long, name:String, domainId:Long, groupId:Long) {
     import scalaj.http._
     import together.data._
-    import org.json4s._
-    import org.json4s.JsonDSL._
-    import org.json4s.jackson.JsonMethods._
-    import org.json4s.jackson.Serialization
-    import org.json4s.jackson.Serialization.{read, write}
 
     val protocol = "http://"
     val auth = "/auth"
@@ -339,7 +342,7 @@ object AudioClient {
       val request = Http(url).method("PUT").header("content-type", "application/json")
       val response:HttpResponse[String] = request.asString
 
-      println("  RCV: " + request.toString + " " + response)
+      println("  RCV: " + response.code + ":" + response.body)
 
       response.toString
     }
@@ -350,7 +353,7 @@ object AudioClient {
       val response: HttpResponse[String] =
         Http(url).method("GET").header("content-type", "application/json").asString
 
-      response.toString
+      response.body
     }
   }
 
@@ -445,8 +448,9 @@ object AudioClient {
           case h if h.startsWith("list") =>
             if (wc.isDefined) {
               val client = wc.get
-              val datum = client.listRooms
-              print(datum)
+              val body = client.listRooms
+              val json = parse(body)
+              println(pretty(json))
             } else {
               println(s"No Login info to connect to server.")
             }
@@ -522,10 +526,11 @@ object AudioClient {
     val p = new Playback(socket)
     Future(p.runIt)
 
-    readLine()
+    //readLine()
+    //val f2 = Future(c.haltAfter(10*1000))
+    //Future(p.haltAfter(10*1000))
 
-    val f2 = Future(c.haltAfter(10*1000))
-    Future(p.haltAfter(10*1000))
+    Unit
   }
 
   def runclient(file:Option[String]):Unit = {

@@ -1,4 +1,7 @@
+<?xml version="1.0"?>
+
 <configuration>
+
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <!-- encoders are assigned the type
          ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
@@ -23,16 +26,53 @@
     </encoder>
   </appender>
 
+  <appender name="S-FILE" class="ch.qos.logback.core.FileAppender">
+    <file>sending.log</file>
+    <append>true</append>
+    <prudent>true</prudent>
+    <encoder>
+      <pattern>%logger{35} - %msg %n</pattern>
+    </encoder>
+  </appender>
+  <appender name="R-FILE" class="ch.qos.logback.core.FileAppender">
+    <file>receiving.log</file>
+    <append>true</append>
+    <prudent>true</prudent>
+    <encoder>
+      <pattern>%logger{35} - %msg %n</pattern>
+    </encoder>
+  </appender>
+  <appender name="D-FILE" class="ch.qos.logback.core.FileAppender">
+    <file>disruptor.log</file>
+    <append>true</append>
+    <prudent>true</prudent>
+    <encoder>
+      <pattern>%logger{35} - %msg %n</pattern>
+    </encoder>
+  </appender>
+
   <logger name="scala.slick" level="INFO"/>
   <logger name="org.eclise" level="ERROR"/>"
   <logger name="org.quartz" level="INFO"/>
   <logger name="together" level="DEBUG"/>
 
+  <!-- additivity=false ensures analytics data only goes to the analytics log -->
+  <logger name="sender" level="DEBUG" additivity="false">
+    <appender-ref ref="S-FILE"/>
+  </logger>
+  <logger name="receiver" level="DEBUG" additivity="false">
+    <appender-ref ref="R-FILE"/>
+  </logger>
+  <logger name="disruptor" level="DEBUG" additivity="false">
+    <appender-ref ref="D-FILE"/>
+  </logger>
+
 
   <root level="INFO">
-    <appender-ref ref="STDOUT" />
-    <appender-ref ref="FILE" />
+    <appender-ref ref="STDOUT"/>
+    <appender-ref ref="FILE"/>
   </root>
+
 
 
 </configuration>

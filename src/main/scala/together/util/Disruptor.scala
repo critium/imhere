@@ -4,6 +4,8 @@ import java.nio._
 import together.audio._
 import scala.collection.mutable
 
+import org.slf4j.LoggerFactory
+
 //import com.lmax.disruptor.dsl.Disruptor
 //import java.util.concurrent.Executors
 //import com.lmax.disruptor._
@@ -62,6 +64,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
   @volatile private var writePos:Int = 0
   @volatile private var bufPos:Int = 0
   private var readers = mutable.Map[Long,Int]()
+  private val logger = LoggerFactory.getLogger("disruptor")
 
   /**
    * Allocates the direct byte buffers
@@ -82,7 +85,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
       }
       readers += (userId -> startPos)
 
-      println(":" + marker.toString + ":s: registering at " + startPos)
+      logger.debug(":" + marker.toString + ":s: registering at " + startPos)
     }
   }
 
@@ -91,7 +94,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
    * we expect only 1 thread to write at a time
    */
   def write(raw:Array[Byte]):Unit = {
-    print(marker.toString + ":w:" + writePos)
+    logger.debug(marker.toString + ":w:" + writePos)
 
     //buffer(writePos).put(raw)
     val pos = bufPos * bufSize
@@ -115,7 +118,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     writePos = writePos + 1
     bufPos = writePos % size
 
-    println(":"+marker.toString + ":" + Conversions.checksum(raw))
+    logger.debug("=>:"+marker.toString + ":" + Conversions.checksum(raw))
   }
 
   /**
@@ -125,20 +128,20 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     val pos:Int = readers(userId)
     //val res = buffer(pos).array()
 
-    print(marker.toString + ":r:" + pos)
+    logger.debug(marker.toString + ":r:" + pos)
 
     // not sure this is the best way to do this but here we are
     while(pos >= writePos) {
-      print(marker.toString + ":rlck:")
+      logger.debug(">" + marker.toString + ":rlck:")
       Thread.`yield`
       Thread.sleep(50)
     }
-    if(marker == 1) println(marker.toString + ":r: unlocked")
+    if(marker == 1) logger.debug("<" + marker.toString + ":r: unlocked")
 
     val bufPos = (pos % size) * bufSize
     val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)
 
-    println(":" + marker.toString + ":" + Conversions.checksum(res))
+    logger.debug(":" + marker.toString + ":" + Conversions.checksum(res))
 
     readers += (userId -> (pos + 1))
 

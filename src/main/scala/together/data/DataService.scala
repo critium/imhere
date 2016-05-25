@@ -183,7 +183,7 @@ object DataService {
     }
   }
 
-  def moveToRoom(roomId:Long, userId:Long):Boolean = {
+  def moveToRoom(userId:Long, roomId:Long):Boolean = {
     logger.debug(s"moving $userId to $roomId")
 
     // validate(roomId, userId)
@@ -198,7 +198,7 @@ object DataService {
   }
 
   private def movePersonToRoom(roomId:Long, user:User):Boolean = {
-    removePersonFromRoom(roomId, user) && addPersonToRoom(roomId, user) && changeView(roomId, user)
+    removePersonFromRoom(user) && addPersonToRoom(roomId, user) && changeView(roomId, user)
   }
 
   private def changeView(roomId:Long, user:User):Boolean = {
@@ -220,21 +220,20 @@ object DataService {
     }
   }
 
-  private def removePersonFromRoom(roomId:Long, user:User):Boolean = {
+  private def removePersonFromRoom(user:User):Boolean = {
     val rooms = getRooms(user)
 
-    val roomOpt = rooms.values.find(_.people.keys.toList.contains(user.id))
+    rooms.values.map{  r =>
+      val pSize1 = r.people.size
+      r.people.remove(user.id)
+      val pSize2 = r.people.size
 
-    val rVal = roomOpt.map { room =>
-      //logger.debug("Before remove: " + room.people.size)
-      room.people.remove(roomId)
-      //logger.debug("After remove: " + room.people.size)
+      if(pSize2 != pSize2) {
+        println(s"Removed User from ${r.id}")
+      }
     }
 
-    rVal match {
-      case Some(_) => true
-      case _ => false
-    }
+    true
   }
 
   private def addPersonToRoom(roomId:Long, user:User):Boolean = {
