@@ -1,13 +1,11 @@
-package together.data
+package together.audio
 
 import java.net.Socket
 import java.nio.ByteBuffer
-import java.nio.channels.SocketChannel
+import java.nio.channels.ByteChannel
 
 import together.util._
 import together.audio.Conversions._
-import together.audio.AudioServer._
-import together.audio.AudioServer.RelayServer
 
 import scala.collection.mutable
 import scala.util._
@@ -17,7 +15,7 @@ import org.slf4j.LoggerFactory
 trait ChannelSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  protected def readChannel(lengthInBytes:Int, channel:SocketChannel, toBuf:Option[ByteBuffer] = None):ByteBuffer = {
+  protected def readChannel(lengthInBytes:Int, channel:ByteChannel, toBuf:Option[ByteBuffer] = None):ByteBuffer = {
     //logger.debug(s"RCV: readchannel=${lengthInBytes}")
     val buf = toBuf match {
       case Some(b) => b
@@ -34,7 +32,7 @@ trait ChannelSupport {
     buf
   }
 
-  protected def writeChannel(buf:ByteBuffer, channel:SocketChannel):Unit = {
+  protected def writeChannel(buf:ByteBuffer, channel:ByteChannel):Unit = {
     while(buf.hasRemaining()) {
       channel.write(buf);
     }

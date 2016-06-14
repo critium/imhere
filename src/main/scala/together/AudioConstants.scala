@@ -39,6 +39,10 @@ package object audio {
   val bufferBarrier = 128 // this is much too large, but lets see
   val bufferCheck = 10;
 
+  val MAX_VOL = 10
+  val MIN_VOL = 0
+  val NORMAL_LEVEL = ((MAX_VOL + MIN_VOL) / 2).toInt
+
   def getAudioFormat:AudioFormat = {
     logger.debug("FORMAT: enc:" + encoding.toString() + " r:" + rate + " ss:" + sampleSize + " c:" + channels + " be:" + bigEndian);
     return new AudioFormat(encoding, rate, sampleSize, channels, (sampleSize/8)*channels, rate, bigEndian);

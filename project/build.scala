@@ -45,7 +45,7 @@ object imhereproject extends Build {
         "org.scalatra"      %% "scalatra"          % ScalatraVersion,
         "org.scalatra"      %% "scalatra-scalate"  % ScalatraVersion,
         "org.scalatra"      %% "scalatra-json"     % ScalatraVersion,
-        "org.scalatra"      %% "scalatra-specs2"   % ScalatraVersion    % "test",
+        //"org.scalatra"      %% "scalatra-specs2"   % ScalatraVersion    % "test",
 
         "org.specs2"        %% "specs2-core"       % "3.7.2"            % "test" force(),
         "ch.qos.logback"    %  "logback-classic"   % "1.1.3"            % "runtime",

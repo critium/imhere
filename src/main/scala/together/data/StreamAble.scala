@@ -2,12 +2,11 @@ package together.data
 
 import java.net.Socket
 import java.nio.ByteBuffer
-import java.nio.channels.SocketChannel
+import java.nio.channels.ByteChannel
 
 import together.util._
+import together.audio._
 import together.audio.Conversions._
-import together.audio.AudioServer._
-import together.audio.AudioServer.RelayServer
 
 import scala.collection.mutable
 import scala.util._
@@ -36,9 +35,9 @@ trait StreamAble[T] extends ChannelSupport {
   /**
    * Channel version of fromStream
    */
-  def fromChannel(channel:SocketChannel):Option[T] = ???
+  def fromChannel(channel:ByteChannel):Option[T] = ???
 
-  protected def _fromChannel(channel:SocketChannel):Option[JValue] = {
+  protected def _fromChannel(channel:ByteChannel):Option[JValue] = {
     def getContentLength = {
       val buf = readChannel(contentLengthSize, channel)
       buf.getInt(0)
@@ -97,7 +96,7 @@ trait StreamAble[T] extends ChannelSupport {
   /**
    * Channel version of toStream
    */
-  def toChannel(src:T, channel:SocketChannel):Unit = ???
+  def toChannel(src:T, channel:ByteChannel):Unit = ???
 
   protected def dataToStreamable(json:JValue):(Int, String) = {
     val contentSrc:StringBuilder = new StringBuilder(write(json))
@@ -112,7 +111,7 @@ trait StreamAble[T] extends ChannelSupport {
     (contentLength, content)
   }
 
-  protected def _toChannel(json:JValue, channel:SocketChannel):Unit = {
+  protected def _toChannel(json:JValue, channel:ByteChannel):Unit = {
     val (contentLength, content) = dataToStreamable(json)
 
     println(s"SND: ${contentLength}, '${content}(${content.toString.getBytes.size})'")

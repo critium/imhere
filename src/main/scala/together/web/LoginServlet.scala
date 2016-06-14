@@ -21,12 +21,14 @@ import together.data._
 class LoginServlet extends ScalatraServlet with JacksonJsonSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
+  val dataService = DataService.default
+
   protected implicit val jsonFormats: Formats = DefaultFormats
 
   post("/login/?") {
     contentType = formats("json")
     val u:User = parsedBody.extract[User]
-    DataService.login(u) match {
+    dataService.loginUser(u) match {
       case Some(l) =>
         logger.debug("Sending " + l)
         render(l)

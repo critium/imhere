@@ -19,6 +19,8 @@ import together.data._
 class UserServlet extends ScalatraServlet with JacksonJsonSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
+  val dataService = DataService.default
+
   protected implicit val jsonFormats: Formats = DefaultFormats
 
   put("/:uid/room/:roomId") {
@@ -26,14 +28,14 @@ class UserServlet extends ScalatraServlet with JacksonJsonSupport {
     val uid = params("uid").toLong
     val roomId = params("roomId").toLong
 
-    DataService.moveToRoom(uid, roomId)
+    dataService.moveToRoom(uid, roomId)
   }
 
   get("/:uid/rooms") {
     contentType = formats("json")
     val uid = params("uid").toLong
 
-    val rooms:List[WebRoom] = DataService.listRooms(uid)
+    val rooms:List[Room] = dataService.listRooms(uid)
     val res:JValue = rooms
 
     render(("rooms" -> res))
