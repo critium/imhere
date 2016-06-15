@@ -10,7 +10,7 @@ import together.audio._
 import together.audio.Conversions._
 
 
-class DataServiceSpec extends mutable.Specification {
+class ChannelServiceSpec extends mutable.Specification {
   class TestChannel extends ByteChannel {
     val bb = ByteBuffer.allocate(bufferLengthInBytes)
 
@@ -56,8 +56,6 @@ class DataServiceSpec extends mutable.Specification {
       val u1av = ds.getAudioViewForUser(u1.id)
       val u2av = ds.getAudioViewForUser(u2.id)
       val u3av = ds.getAudioViewForUser(u3.id)
-
-      println("views:" + ds.getViews(u1.id))
 
       "Then user table should be populated" in {
         ds.getUsers(u1.id).size must equalTo(3)
