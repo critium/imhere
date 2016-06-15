@@ -284,14 +284,78 @@ class DataServiceSpec extends mutable.Specification {
       }
 
       "user 3 volume should end at 7" in {
+        val res = ds.changeVolume(u2.id, u3.id, Volume.UP)
+        res must beSome(7)
         u2Av.find(_.userId == u3.id).map(_.volume) must beSome(7)
       }
     }
 
-    "When Test User 2 change User 1 Volume UP to MAX" in pending { ok }
-    "When Test User 2 change User 1 Volume DOWN" in pending { ok }
-    "When Test User 2 change User 1 Volume DOWN to MIN" in pending { ok }
-    "When Test User 2 logout" in pending { ok }
+    "When Test User 2 change User 1 Volume UP to MAX" in {
+      "user 3 volume should stop at 10" in {
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        ds.changeVolume(u2.id, u3.id, Volume.UP)
+        val res = ds.changeVolume(u2.id, u3.id, Volume.UP)
+        res must beSome(10)
+        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(10)
+      }
+    }
+
+    "When Test User 2 change User 1 Volume DOWN" in {
+      "user 3 volume should go back to 9" in {
+        val res = ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        res must beSome(9)
+        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(9)
+      }
+    }
+
+    "When Test User 2 change User 1 Volume DOWN to MIN" in {
+      "user 3 volume should go back to 9" in {
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        val res = ds.changeVolume(u2.id, u3.id, Volume.DOWN)
+        res must beSome(0)
+        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(0)
+      }
+    }
+
+    "When Test User 2 logout" in {
+      "do it" in {
+        ds.getUserRoom(u2.id).get(u2.id) should beSome
+        ds.getAudioViewForUser(u2.id).size must be_>=(1)
+        ds.getAudioViewForUser(u3.id).find(_.userId == u2.id) should beSome
+        ds.getUsers(u3.id).get(u2.id) should beSome
+        ds.logout(u2.id)
+      }
+
+      "user room should remove it" in {
+        ds.getUserRoom(u2.id).get(u2.id) should beNone
+      }
+
+      "views should remove it" in {
+        ds.getAudioViewForUser(u2.id).size must be_==(0)
+        ds.getAudioViewForUser(u3.id).find(_.userId == u2.id) should beNone
+      }
+
+      "users should remove it" in {
+        ds.getUsers(u3.id).get(u2.id) should beNone
+      }
+    }
 
     // channels and views ?????
 

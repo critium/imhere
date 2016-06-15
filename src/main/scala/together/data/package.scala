@@ -97,10 +97,9 @@ package object data {
           this.volume = MAX_VOL
         case (i, Volume.DOWN) if (i - 1) <= MIN_VOL =>
           this.volume = MIN_VOL
-        case (i, Volume.UP) => {
+        case (i, Volume.UP) =>
           this.volume = this.volume + 1
-        }
-        case (i, Volume.DOWN) if i<= MIN_VOL =>
+        case (i, Volume.DOWN) =>
           this.volume = this.volume - 1
       }
       this.volume
