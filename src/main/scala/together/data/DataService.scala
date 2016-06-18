@@ -35,6 +35,7 @@ trait DataServiceTrait {
   def getAudioViewForUser(userId:Long):List[AudioView]
   def getRoomIdForUser(userId:Long):Option[Long]
   def getHostInfo(user:User):HostInfo
+  def getOthersInRoom(userId:Long):List[Long]
 }
 
 object DataService {
@@ -276,6 +277,15 @@ class DataServiceImpl extends DataServiceTrait {
 
   override def listRooms(userId:Long):List[Room] = {
     getRooms(userId).values.toList
+  }
+
+
+  override def getOthersInRoom(userId:Long):List[Long] = {
+    val ur = getUserRoom(userId)
+    ur.get(userId).map{ currRoom =>
+      val urList:UserRoomMap = ur.filter{ case(k,v) => v.roomId == currRoom.roomId && k != userId }
+      urList.keys.toList
+    }.getOrElse(List[Long]())
   }
 
 }

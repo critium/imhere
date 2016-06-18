@@ -79,11 +79,11 @@ object AudioServerChannelMult {
       def handleSocket(userId:Long, channel:SocketChannel):Future[Unit] = Future {
         logger.debug(s"Login Success For: ${userId}/${channel.getRemoteAddress}")
         channel.setOption[java.lang.Boolean](StandardSocketOptions.TCP_NODELAY, true)
-        val aUser:Option[AudioPipeline] = ChannelService.getAudioPipeline(userId)
+        //val aUser:Option[AudioPipeline] = ChannelService.getAudioPipeline(userId)
 
-        aUser.foreach { aUser =>
-          ChannelService.addUser(aUser, lobbyRoomId)
-        }
+        //aUser.foreach { aUser =>
+          //ChannelService.addUser(aUser, lobbyRoomId)
+        //}
       }
 
     }

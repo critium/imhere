@@ -53,8 +53,11 @@ object ChannelService extends ChannelSupport {
   def getBuffers(userId:Long) = _buffers
 
   def login(userId:Long, channel:ByteChannel):Unit = {
+    val buffer = CircularByteBuffer.newBuf(userId.toInt)
     getChannels(userId) += (userId -> channel)
-    getBuffers(userId) += (userId -> CircularByteBuffer.newBuf(userId.toInt))
+    getBuffers(userId) += (userId -> buffer)
+
+    addUser(AudioPipeline(userId,channel,buffer), lobbyRoomId)
   }
 
   def addUser(pipeline:AudioPipeline, roomId:Long) = {
@@ -77,7 +80,13 @@ object ChannelService extends ChannelSupport {
 
   }
 
-  def getAudioPipeline(userId:Long):Option[AudioPipeline] = {
+  def getOthersInRoom(userId:Long):List[AudioPipeline] = {
+    dataService.getOthersInRoom(userId).map { otherUserId =>
+      getAudioPipeline(otherUserId)
+    }.flatten
+  }
+
+  private def getAudioPipeline(userId:Long):Option[AudioPipeline] = {
     for {
       c <- getChannels(userId).get(userId)
       b <- getBuffers(userId).get(userId)
@@ -128,11 +137,13 @@ class ChannelReader() extends Runnable with ChannelSupport {
 
   case class ChannelReaderContext(
     userId:Long,
-    var view:AudioView,
+    var view:List[AudioView],
     var others:List[AudioPipeline],
     var level:Int,
-    var readCt:Int,
-    channel:ByteChannel)
+    val readCt:mutable.Map[Long, Int],
+    channel:ByteChannel) {
+      def pos(userId:Long):Int = readCt.get(userId).getOrElse(0)
+    }
 
   val dataService = DataService.default
 
@@ -146,48 +157,44 @@ class ChannelReader() extends Runnable with ChannelSupport {
   }
 
   def addUser(aUser:AudioPipeline, roomId:Long):Unit = {
-    //val userId = aUser.id
-    //var view:AudioView = dataService.getAudioViewForUser(userId)
-
-    //var readCt:Int = 0
-    //var others:List[AudioPipeline] = view.people.filterKeys(_.id != userId).values
-    //others.map { _.buffer.register(aUser.userId)} // register here
-    //var level = others.size
-    //contexts += (userId, ChannelReaderContext(userId, view, others, level, readCt, aUser.channel))
+    val userId = aUser.id
+    var view:List[AudioView] = dataService.getAudioViewForUser(userId)
+    var others:List[AudioPipeline] = ChannelService.getOthersInRoom(userId)
+    var level = others.size
+    val readCt = mutable.Map[Long,Int]();
+    contexts += (userId -> ChannelReaderContext(userId, view, others, level, readCt, aUser.channel))
   }
 
   def readMultiple(context:ChannelReaderContext):Unit = {
-    //val userId = context.userId
-    //if(context.readCt % bufferCheck == 0) {
-      //val roomId = dataService.getRoomIdForUser(userId)
-      //dataService.getAudioViewForUser(userId, roomId) foreach (context.view = _)
-      //context.others = context.view.people.filterKeys(_ != userId).values
-      //// register ehre
-      //context.others.map { _.buffer.register(userId) }
-      //context.level = context.others.size
-    //}
+    val userId = context.userId
+    if(context.pos(userId) % bufferCheck == 0) {
+      val roomId = dataService.getRoomIdForUser(userId)
+      context.others = ChannelService.getOthersInRoom(userId)
+      context.level = context.others.size
+      context.view = dataService.getAudioViewForUser(userId)
+    }
 
     ////view = DataService.getAudioViewForUser(userId)
-    //if(context.view.people.size > 1) {
-      //var sumStreams:Array[Byte] = context.others.foldLeft(baseline){ ( l,c ) =>
-        //val thisStream = c.buffer.read(Some(readCt), userId)
-        //if(java.util.Arrays.equals(thisStream,baseline)) {
-          //l
-        //} else {
-          //for(i <- 0 until bufferLengthInBytes) {
-            //l(i) = thisStream(i)
-          //}
-          //l
-        //}
-      //}
-      //writeChannel(ByteBuffer.wrap(sumStreams), context.channel)
-      //context.readCt = context.readCt + 1
+    if(context.view.size > 1) {
+      var sumStreams:Array[Byte] = context.others.foldLeft(baseline){ ( l,c ) =>
+        val (newPos, thisStream) = c.buffer.read(Some(context.pos(userId)), userId)
+        context.readCt += (userId -> newPos)
+        if(java.util.Arrays.equals(thisStream,baseline)) {
+          l
+        } else {
+          for(i <- 0 until bufferLengthInBytes) {
+            l(i) = thisStream(i)
+          }
+          l
+        }
+      }
+      writeChannel(ByteBuffer.wrap(sumStreams), context.channel)
 
-    //} else {
-      //logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
-      //Thread.sleep(1*1000)
-      //Thread.`yield`
-    //}
+    } else {
+      logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
+      Thread.sleep(1*1000)
+      Thread.`yield`
+    }
   }
 
   def shutdown():Unit = {

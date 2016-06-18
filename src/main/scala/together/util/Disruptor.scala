@@ -152,6 +152,6 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
 
     readers += (userId -> (pos + 1))
 
-    (pos, res)
+    (pos + 1, res)
   }
 }
