@@ -36,6 +36,7 @@ object ChannelService extends ChannelSupport {
   def shutdown() = {
     channelWriter.shutdown()
     channelReader.shutdown()
+
     wThread.join()
     rThread.join()
   }
@@ -128,6 +129,7 @@ class ChannelWriter() extends Runnable with ChannelSupport {
     while(running) {
       users.values.foreach( writeMultiple(_) )
     }
+    logger.debug("SHUTTING DOWN WRITER")
   }
 }
 
@@ -188,6 +190,7 @@ class ChannelReader() extends Runnable with ChannelSupport {
           l
         }
       }
+
       writeChannel(ByteBuffer.wrap(sumStreams), context.channel)
 
     } else {
@@ -205,5 +208,6 @@ class ChannelReader() extends Runnable with ChannelSupport {
     while(running){
       contexts.values.foreach { readMultiple(_) }
     }
+    logger.debug("SHUTTING DOWN READER")
   }
 }

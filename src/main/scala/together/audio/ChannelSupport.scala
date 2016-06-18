@@ -33,7 +33,10 @@ trait ChannelSupport {
   }
 
   protected def writeChannel(buf:ByteBuffer, channel:ByteChannel):Unit = {
+    //println("G:" + buf.array().size)
+    var ct = 0
     while(buf.hasRemaining()) {
+      ct = ct + 1
       channel.write(buf);
     }
   }

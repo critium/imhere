@@ -17,17 +17,20 @@ class ChannelServiceSpec extends mutable.Specification {
 
     def close(): Unit = ???
     def isOpen(): Boolean = ???
+
     def read(r:java.nio.ByteBuffer): Int = {
       r.put(rBuffer.array())
       rBuffer.array().length
     }
     def write(w:java.nio.ByteBuffer): Int = {
-      wBuffer.rewind()
+      wBuffer.clear()
       wBuffer.put(w.array())
+      w.position(w.capacity())
       w.array().length
     }
 
     def clientReadWrite(w:java.nio.ByteBuffer):Unit = {
+      rBuffer.clear()
       rBuffer.put(w.array())
     }
 
@@ -75,6 +78,7 @@ class ChannelServiceSpec extends mutable.Specification {
       }
 
       "Sending 1s on a1 should send 1 * .1 on other channels since they're not talking" in {
+        /// test running too fast, its filling everything up with zeros
         val arr = Array.ofDim[Byte](bufferLengthInBytes)
         val buf = ByteBuffer.wrap(arr)
         c1.clientWriteRead(buf)
@@ -97,6 +101,16 @@ class ChannelServiceSpec extends mutable.Specification {
     // 1. Change rooms
     // 2. Change to talking
     // 2. Change volume
+    // login, logout
+
+  }
+
+  "Shutdown" in {
+    println("SHUTDOWN")
+    ChannelService.shutdown()
+    ok
+  }
+
 
 
     //"When Test User 1 move to room A" in {
@@ -366,10 +380,5 @@ class ChannelServiceSpec extends mutable.Specification {
 
     //// serverside passive vs active listen
 
-    "Shutdown" in {
-      ChannelService.shutdown()
-      ok
-    }
-  }
 
 }
