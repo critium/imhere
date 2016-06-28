@@ -21,7 +21,6 @@ import org.json4s.jackson.Serialization.{read, write}
 trait DataServiceTrait {
   private val logger = LoggerFactory.getLogger(getClass)
   def loginUser(user:User):Option[LoginInfo]
-  def loginAudio(audioLogin:AudioLogin, channel:ByteChannel):Try[AudioLogin]
   def moveToRoom(userId:Long, roomId:Long):Boolean
   def createRoom(userId:Long, name:String):Room
   def closeRoom(userId:Long, roomId:Long):Boolean
@@ -38,15 +37,10 @@ trait DataServiceTrait {
   def getOthersInRoom(userId:Long):List[Long]
 }
 
-object DataService {
-  val default = new DataServiceImpl()
-}
-
 class DataServiceImpl extends DataServiceTrait {
   private val logger = LoggerFactory.getLogger(getClass)
-  //private var domains = MutableMap[Long, Domain]()
-  //private var groups = MutableMap[Long, Group]()
 
+  logger.debug("DS 1")
   /**
    * Creates the empty lobby room
    */
@@ -142,7 +136,7 @@ class DataServiceImpl extends DataServiceTrait {
     }
   }
 
-  override def logout(userId:Long):Boolean = {
+  override def logout(userId:Long):Boolean = { Try {
     // remove the links
     getUserRoom(userId) -= userId
 
@@ -155,13 +149,12 @@ class DataServiceImpl extends DataServiceTrait {
 
     // remove the user
     getUsers(userId) -= (userId)
-
-    ChannelService.logout(userId)
-  }
-
-  override def loginAudio(audioLogin:AudioLogin, channel:ByteChannel):Try[AudioLogin] = {
-    ChannelService.login(audioLogin.userId, channel)
-    Success(audioLogin)
+    } match {
+      case Success(v) => true
+      case Failure(e) =>
+        logger.error("Could not logout: ", e)
+        false
+    }
   }
 
   private def getNextRoomId(userId:Long) = getRooms(userId).foldLeft(0l){ (l:Long,r:(Long, Room)) =>
@@ -288,6 +281,7 @@ class DataServiceImpl extends DataServiceTrait {
     }.getOrElse(List[Long]())
   }
 
+  logger.debug("DS 1")
 }
 
 

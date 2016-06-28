@@ -13,9 +13,23 @@ import scala.util._
 
 import org.slf4j.LoggerFactory
 
-object ChannelService extends ChannelSupport {
+trait ChannelServiceTrait {
+  def shutdown()
+  def tick
+  def getChannels(userId:Long):mutable.Map[Long, ByteChannel]
+  def getBuffers(userId:Long):mutable.Map[Long, CircularByteBuffer]
+  def login(audioLogin:AudioLogin, channel:ByteChannel):Try[AudioLogin]
+  def addUser(pipeline:AudioPipeline, roomId:Long)
+  def logoutAudio(userId:Long):Boolean
+  def getOtherPipelinesInRoom(userId:Long):List[AudioPipeline]
+  def tap
+}
+
+class ChannelServiceImpl(debug:Boolean) extends ChannelServiceTrait with ChannelSupport {
   private val logger = LoggerFactory.getLogger(getClass)
-  val dataService = DataService.default
+
+  val dataService = ServiceLocator.dataService
+  //val dataService = DataService.default
   logger.info("STARTING THE CHANNEL SERVER")
 
   // all channels
@@ -24,21 +38,25 @@ object ChannelService extends ChannelSupport {
   // all buffers.  this belongs on the audioserver
   @volatile private var _buffers = mutable.Map[Long, CircularByteBuffer]()
 
-  private val channelWriter = new ChannelWriter()
-  private val channelReader = new ChannelReader()
+  private val channelWriter = new ChannelWriter(dataService)
+  private val channelReader = new ChannelReader(dataService, this)
 
-  private val wThread = new Thread(ChannelService.getChannelWriter())
-  private val rThread = new Thread(ChannelService.getChannelReader())
+  private val wThread = new Thread(getChannelWriter())
+  private val rThread = new Thread(getChannelReader())
 
-  wThread.start()
-  rThread.start()
+  if(!debug) {
+    wThread.start()
+    rThread.start()
+  }
 
-  def shutdown() = {
+  override def shutdown() = {
     channelWriter.shutdown()
     channelReader.shutdown()
 
-    wThread.join()
-    rThread.join()
+    if(!debug){
+      wThread.join()
+      rThread.join()
+    }
   }
 
   private def getChannelWriter() = {
@@ -49,24 +67,27 @@ object ChannelService extends ChannelSupport {
     channelReader
   }
 
-  def getChannels(userId:Long) = _channels
+  override def getChannels(userId:Long) = _channels
 
-  def getBuffers(userId:Long) = _buffers
+  override def getBuffers(userId:Long) = _buffers
 
-  def login(userId:Long, channel:ByteChannel):Unit = {
+  override def login(audioLogin:AudioLogin, channel:ByteChannel):Try[AudioLogin] = Try {
+    val userId = audioLogin.userId
     val buffer = CircularByteBuffer.newBuf(userId.toInt)
     getChannels(userId) += (userId -> channel)
     getBuffers(userId) += (userId -> buffer)
 
     addUser(AudioPipeline(userId,channel,buffer), lobbyRoomId)
+
+    audioLogin
   }
 
-  def addUser(pipeline:AudioPipeline, roomId:Long) = {
+  override def addUser(pipeline:AudioPipeline, roomId:Long) = {
     getChannelWriter().addUser(pipeline)
     getChannelReader().addUser(pipeline, roomId)
   }
 
-  def logout(userId:Long):Boolean = {
+  override def logoutAudio(userId:Long):Boolean = {
     Try{
       getChannelWriter().removeUser(userId)
       getChannelReader().removeUser(userId)
@@ -81,7 +102,7 @@ object ChannelService extends ChannelSupport {
 
   }
 
-  def getOthersInRoom(userId:Long):List[AudioPipeline] = {
+  override def getOtherPipelinesInRoom(userId:Long):List[AudioPipeline] = {
     dataService.getOthersInRoom(userId).map { otherUserId =>
       getAudioPipeline(otherUserId)
     }.flatten
@@ -94,12 +115,22 @@ object ChannelService extends ChannelSupport {
     } yield AudioPipeline(userId, c, b)
   }
 
+  override def tick = if(debug) {
+    channelWriter.tick
+    channelReader.tick
+  }
+
+  override def tap = {
+    channelWriter.tap
+  }
+
+  logger.info("STARTING THE CHANNEL SERVER")
+
 }
 
 // TODO: Check perf differnce with using native byte buffers
-class ChannelWriter() extends Runnable with ChannelSupport {
+class ChannelWriter(dataService:DataServiceTrait) extends Runnable with ChannelSupport {
   private val logger = LoggerFactory.getLogger(getClass)
-  val dataService = DataService.default
 
   @volatile var users:mutable.Map[Long, AudioPipeline] = mutable.Map[Long, AudioPipeline]()
   @volatile var running = true
@@ -131,9 +162,20 @@ class ChannelWriter() extends Runnable with ChannelSupport {
     }
     logger.debug("SHUTTING DOWN WRITER")
   }
+
+  def tick = {
+    users.values.foreach( writeMultiple(_) )
+  }
+
+  def tap:Unit = {
+    users foreach { case (k,p) =>
+      p.buffer.tap(k)
+    }
+  }
 }
 
-class ChannelReader() extends Runnable with ChannelSupport {
+class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceTrait) extends Runnable with ChannelSupport {
+
   private val logger = LoggerFactory.getLogger(getClass)
   @volatile var running = true
 
@@ -147,8 +189,6 @@ class ChannelReader() extends Runnable with ChannelSupport {
       def pos(userId:Long):Int = readCt.get(userId).getOrElse(0)
     }
 
-  val dataService = DataService.default
-
   var contexts:mutable.Map[Long, ChannelReaderContext] = mutable.Map[Long, ChannelReaderContext]()
 
   val baseline = Array.ofDim[Byte](bufferLengthInBytes)
@@ -161,7 +201,7 @@ class ChannelReader() extends Runnable with ChannelSupport {
   def addUser(aUser:AudioPipeline, roomId:Long):Unit = {
     val userId = aUser.id
     var view:List[AudioView] = dataService.getAudioViewForUser(userId)
-    var others:List[AudioPipeline] = ChannelService.getOthersInRoom(userId)
+    var others:List[AudioPipeline] = channelService.getOtherPipelinesInRoom(userId)
     var level = others.size
     val readCt = mutable.Map[Long,Int]();
     contexts += (userId -> ChannelReaderContext(userId, view, others, level, readCt, aUser.channel))
@@ -171,7 +211,7 @@ class ChannelReader() extends Runnable with ChannelSupport {
     val userId = context.userId
     if(context.pos(userId) % bufferCheck == 0) {
       val roomId = dataService.getRoomIdForUser(userId)
-      context.others = ChannelService.getOthersInRoom(userId)
+      context.others = channelService.getOtherPipelinesInRoom(userId)
       context.level = context.others.size
       context.view = dataService.getAudioViewForUser(userId)
     }
@@ -209,5 +249,9 @@ class ChannelReader() extends Runnable with ChannelSupport {
       contexts.values.foreach { readMultiple(_) }
     }
     logger.debug("SHUTTING DOWN READER")
+  }
+
+  def tick = {
+    contexts.values.foreach { readMultiple(_) }
   }
 }

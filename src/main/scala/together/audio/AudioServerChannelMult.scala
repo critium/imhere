@@ -22,7 +22,8 @@ import org.slf4j.LoggerFactory
 
 object AudioServerChannelMult {
   private val logger = LoggerFactory.getLogger(getClass)
-  val ds = DataService.default
+  val ds = ServiceLocator.dataService
+  val cs = ServiceLocator.channelService
 
 
   object RelayServerChanMult {
@@ -55,7 +56,7 @@ object AudioServerChannelMult {
         logger.debug("Login?: " + audioLoginMaybe)
 
         val res:Option[Future[Unit]] = audioLoginMaybe map { audioLogin =>
-          ds.loginAudio(audioLogin, channel) match {
+          cs.login(audioLogin, channel) match {
             case Success(audioLogin) =>
               val ack = AudioAck("Log In Complete")
 

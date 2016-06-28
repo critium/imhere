@@ -76,6 +76,10 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     //}
   }
 
+  def tap(k:Long) = {
+    logger.debug(buffer.mkString(s"$k => [","", "]"))
+  }
+
   def register(userId:Long):Unit = {
     if(! readers.get(userId).isDefined) {
       val startPos = if(writePos <= 0) {

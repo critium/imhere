@@ -39,7 +39,9 @@ class ChannelServiceSpec extends mutable.Specification {
     }
   }
 
-  val ds = DataService.default
+  val channelService = ServiceLocator.channelService
+  val ds = ServiceLocator.dataService
+
   ds.registerServer(AudioServerInfo("127.0.0.1", "localhost", 55555))
 
   val u1 = User(1, "User 1", 1, 1, "#")
@@ -71,9 +73,9 @@ class ChannelServiceSpec extends mutable.Specification {
 
     "When Test Audio Login User 1,2 and 3" in {
       "Then login should not fail" in {
-        ds.loginAudio(a1, c1)
-        ds.loginAudio(a2, c2)
-        ds.loginAudio(a3, c3)
+        channelService.login(a1, c1)
+        channelService.login(a2, c2)
+        channelService.login(a3, c3)
         ok
       }
 
@@ -83,12 +85,20 @@ class ChannelServiceSpec extends mutable.Specification {
         val buf = ByteBuffer.wrap(arr)
         c1.clientWriteRead(buf)
         Thread.sleep(100)
+
+        channelService.tick
+
+        // read from buffer
         val c2Buf = ByteBuffer.allocate(bufferLengthInBytes)
         c2.clientReadWrite(c2Buf)
         println("c2Buf: " + Conversions.checksum(c2Buf.array()))
+
         val c3Buf = ByteBuffer.allocate(bufferLengthInBytes)
         c3.clientReadWrite(c3Buf)
         println("c3Buf: " + Conversions.checksum(c3Buf.array()))
+
+        channelService.tap
+
         ok
       }
 
@@ -107,7 +117,7 @@ class ChannelServiceSpec extends mutable.Specification {
 
   "Shutdown" in {
     println("SHUTDOWN")
-    ChannelService.shutdown()
+    channelService.shutdown()
     ok
   }
 

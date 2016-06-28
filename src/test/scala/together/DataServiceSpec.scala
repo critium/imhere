@@ -26,8 +26,15 @@ class DataServiceSpec extends mutable.Specification {
     }
   }
 
-  val ds = DataService.default
+  println("1")
+  val channelService = ServiceLocator.channelService
+  println("1")
+  val ds = ServiceLocator.dataService.asInstanceOf[DataServiceImpl]
+  println("1")
+
+  println("1")
   ds.registerServer(AudioServerInfo("127.0.0.1", "localhost", 55555))
+  println("1")
 
   val u1 = User(1, "User 1", 1, 1, "#")
   val u2 = User(2, "User 2", 1, 1, "#")
@@ -48,6 +55,7 @@ class DataServiceSpec extends mutable.Specification {
   var ct = 0
   var room3:Room = null
   var u2Av:List[AudioView] = null
+
 
   sequential
 
@@ -78,18 +86,18 @@ class DataServiceSpec extends mutable.Specification {
 
     "When Test Audio Login User 1,2 and 3" in {
       "Then get channels should equal to 1 when user1 logs in" in {
-        ds.loginAudio(a1, c1)
-        ChannelService.getChannels(a1.userId).size must equalTo(1)
+        channelService.login(a1, c1)
+        channelService.getChannels(a1.userId).size must equalTo(1)
       }
 
       "Then get channels should equal to 2 when user2 logs in " in {
-        ds.loginAudio(a2, c2)
-        ChannelService.getChannels(a2.userId).size must equalTo(2)
+        channelService.login(a2, c2)
+        channelService.getChannels(a2.userId).size must equalTo(2)
       }
 
       "Then get channels should equal to 3 when user3 logs in " in {
-        ds.loginAudio(a3, c3)
-        ChannelService.getChannels(a3.userId).size must equalTo(3)
+        channelService.login(a3, c3)
+        channelService.getChannels(a3.userId).size must equalTo(3)
       }
 
     }
@@ -362,5 +370,5 @@ class DataServiceSpec extends mutable.Specification {
     // serverside passive vs active listen
   }
 
-  ChannelService.shutdown()
+  channelService.shutdown()
 }

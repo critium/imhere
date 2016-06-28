@@ -21,7 +21,7 @@ import together.data._
 class LoginServlet extends ScalatraServlet with JacksonJsonSupport {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  val dataService = DataService.default
+  val dataService = ServiceLocator.dataService
 
   protected implicit val jsonFormats: Formats = DefaultFormats
 
