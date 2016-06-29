@@ -97,6 +97,23 @@ object Conversions {
     doubles
   }
 
+  def timesFloat = java.lang.Float.SIZE / java.lang.Byte.SIZE
+  def toFloatArray(totalLength:Int, fill:Float):Array[Byte] = {
+
+    val a = Array.fill(timesFloat)(fill.toByte)
+    val floats = Array.ofDim[Byte](totalLength)
+    val numFloats = totalLength / floats.length
+
+    //println(s"Conversion: ${totalLength} / ${timesFloat} / ${numFloats} / ${floats.length}")
+
+    for(i <- 0 until numFloats) {
+      for(j <- 0 until a.length) {
+        floats(i+j) = a(j)
+      }
+    }
+    floats
+  }
+
   /**
    * @see - http://www.mathworks.com/help/signal/ref/blackman.html
    * @param length

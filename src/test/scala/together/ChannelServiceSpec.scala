@@ -80,8 +80,8 @@ class ChannelServiceSpec extends mutable.Specification {
       }
 
       "Sending 1s on a1 should send 1 * .1 on other channels since they're not talking" in {
-        /// test running too fast, its filling everything up with zeros
-        val arr = Array.ofDim[Byte](bufferLengthInBytes)
+        //val arr = Array.ofDim[Byte](bufferLengthInBytes).fill(1)
+        val arr = toFloatArray(bufferLengthInBytes, 1f)
         val buf = ByteBuffer.wrap(arr)
         c1.clientWriteRead(buf)
         Thread.sleep(100)
