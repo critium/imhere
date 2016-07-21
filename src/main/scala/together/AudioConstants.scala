@@ -41,6 +41,7 @@ package object audio {
 
   val MAX_VOL = 10
   val MIN_VOL = 0
+  val SILENT_FCTR = .1
   val NORMAL_LEVEL = ((MAX_VOL + MIN_VOL) / 2).toInt
 
   def getAudioFormat:AudioFormat = {

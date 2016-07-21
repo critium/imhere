@@ -77,7 +77,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
   }
 
   def tap(k:Long) = {
-    logger.debug(buffer.mkString(s"$k => [","", "]"))
+    //logger.debug(buffer.mkString(s"$k => [","", "]"))
   }
 
   def register(userId:Long):Unit = {
@@ -98,9 +98,9 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
    * we expect only 1 thread to write at a time
    */
   def write(raw:Array[Byte]):Unit = {
-    logger.debug(marker.toString + ":w:" + writePos)
-
+    //logger.debug(marker.toString + ":w:" + writePos)
     //buffer(writePos).put(raw)
+
     val pos = bufPos * bufSize
 
     val minReader = readers.values.foldLeft(java.lang.Integer.MAX_VALUE)( (l:Int,r:Int) => if(l < r) {
@@ -122,7 +122,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     writePos = writePos + 1
     bufPos = writePos % size
 
-    logger.debug("=>:"+marker.toString + ":" + Conversions.checksum(raw))
+    logger.debug("w=>:"+marker.toString + ":" + Conversions.checksum(raw))
   }
 
   def calcPos = (writePos - bufSize) match {
@@ -134,28 +134,20 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
    * No locks!  Allow for dirty reads
    */
   def read(posMaybe:Option[Int], userId:Long):(Int, Array[Byte])= {
-    //val pos:Int = readers(userId)
-    //val res = buffer(pos).array()
-
     val pos = posMaybe.getOrElse(calcPos)
+    val msg1 = s"r<=:${marker.toString}=>${userId}:r:${pos}>=${writePos}:"
 
-    logger.debug(marker.toString + ":r:" + pos)
-
-    // not sure this is the best way to do this but here we are
-    while(pos >= writePos) {
-      logger.debug(">" + marker.toString + ":rlck:")
-      Thread.`yield`
-      Thread.sleep(50)
+    val res = if (pos >= writePos) {
+      (pos, Array.ofDim[Byte](0))
+    } else {
+      val bufPos = (pos % size) * bufSize
+      val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)
+      readers += (userId -> (pos + 1))
+      (pos + 1, res)
     }
-    if(marker == 1) logger.debug("<" + marker.toString + ":r: unlocked")
 
-    val bufPos = (pos % size) * bufSize
-    val res = java.util.Arrays.copyOfRange(buffer, bufPos, bufPos + bufSize)
+    logger.debug(msg1 + Conversions.checksum(res._2))
 
-    logger.debug(":" + marker.toString + ":" + Conversions.checksum(res))
-
-    readers += (userId -> (pos + 1))
-
-    (pos + 1, res)
+    res
   }
 }

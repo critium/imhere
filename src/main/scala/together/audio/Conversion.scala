@@ -31,13 +31,19 @@ object Conversions {
 
   def ShortToByte_ByteBuffer_Method(input:Array[Short]):Array[Byte] = {
     var iterations = input.length;
-
     var bb = ByteBuffer.allocate(input.length * 2);
-
     for(index <- 0 until iterations) {
       bb.putShort(input(index));
     }
+    bb.array();
+  }
 
+  def toByteArray(input:Array[Float]):Array[Byte] = {
+    var iterations = input.length;
+    var bb = ByteBuffer.allocate(input.length * timesFloat);
+    for(index <- 0 until iterations) {
+      bb.putFloat(input(index));
+    }
     bb.array();
   }
 
@@ -98,13 +104,50 @@ object Conversions {
   }
 
   def timesFloat = java.lang.Float.SIZE / java.lang.Byte.SIZE
-  def toFloatArray(totalLength:Int, fill:Float):Array[Byte] = {
+  def toFloatArray(byteArray:Array[Byte]):Array[Float] = {
+    val floats = Array.ofDim[Float](byteArray.length / timesFloat)
+    for(i <- 0 until floats.length) {
+      val byteBuff = ByteBuffer.wrap(byteArray, i*timesFloat, timesFloat)
+      byteBuff.order(ByteOrder.BIG_ENDIAN);
+      floats(i) = byteBuff.getFloat();
+    }
+    floats
+  }
 
+  def sumFloatArrays(lF:Array[Float], rF:Array[Float], rFctr:Float):Array[Float] = {
+    for(i <- 0 until lF.size) {
+      lF(i) = lF(i) + (rF(i) * rFctr)
+    }
+
+    lF
+  }
+
+  def normalizeFloat(floats:Array[Float], factor:Float):Array[Float] = {
+    for(i <- 0 until floats.size) {
+      floats(i) = floats(i)  * factor
+    }
+
+    floats
+  }
+
+  def sumFloatBytes(lArr:Array[Byte], rArr:Array[Byte], rFctr:Float):Array[Byte] = {
+    val lF = toFloatArray(lArr)
+    val rF = toFloatArray(rArr)
+    val tF = Array.ofDim[Float](lF.size)
+
+    for(i <- 0 until lF.size) {
+      tF(i) = lF(i) + (rF(i) * rFctr)
+    }
+
+    toByteArray(tF)
+  }
+
+  def toFloatArrayFill(totalLength:Int, fill:Float):Array[Byte] = {
     val a = Array.fill(timesFloat)(fill.toByte)
     val floats = Array.ofDim[Byte](totalLength)
-    val numFloats = totalLength / floats.length
+    val numFloats = totalLength / a.length
 
-    //println(s"Conversion: ${totalLength} / ${timesFloat} / ${numFloats} / ${floats.length}")
+    println(s"Conversion: ${totalLength} / ${timesFloat} / ${numFloats} / ${floats.length}")
 
     for(i <- 0 until numFloats) {
       for(j <- 0 until a.length) {

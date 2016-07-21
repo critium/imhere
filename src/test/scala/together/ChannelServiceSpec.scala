@@ -11,7 +11,7 @@ import together.audio.Conversions._
 
 
 class ChannelServiceSpec extends mutable.Specification {
-  class TestChannel extends ByteChannel {
+  class TestChannel(marker:String) extends ByteChannel {
     val wBuffer = ByteBuffer.allocate(bufferLengthInBytes)
     val rBuffer = ByteBuffer.allocate(bufferLengthInBytes)
 
@@ -23,6 +23,7 @@ class ChannelServiceSpec extends mutable.Specification {
       rBuffer.array().length
     }
     def write(w:java.nio.ByteBuffer): Int = {
+      println(s"Write Invoked:$marker:${Conversions.checksum(w.array())}")
       wBuffer.clear()
       wBuffer.put(w.array())
       w.position(w.capacity())
@@ -52,9 +53,9 @@ class ChannelServiceSpec extends mutable.Specification {
   val l2 = ds.loginUser(u2)
   val l3 = ds.loginUser(u3)
 
-  val c1 = new TestChannel
-  val c2 = new TestChannel
-  val c3 = new TestChannel
+  val c1 = new TestChannel("c1")
+  val c2 = new TestChannel("c2")
+  val c3 = new TestChannel("c3")
 
   val a1 = AudioLogin(1, "#")
   val a2 = AudioLogin(2, "#")
@@ -81,20 +82,21 @@ class ChannelServiceSpec extends mutable.Specification {
 
       "Sending 1s on a1 should send 1 * .1 on other channels since they're not talking" in {
         //val arr = Array.ofDim[Byte](bufferLengthInBytes).fill(1)
-        val arr = toFloatArray(bufferLengthInBytes, 1f)
+        val arr = toFloatArrayFill(bufferLengthInBytes, 1f)
         val buf = ByteBuffer.wrap(arr)
-        c1.clientWriteRead(buf)
-        Thread.sleep(100)
+        c1.clientReadWrite(buf)
+        //println("C1: " + Conversions.checksum(arr))
+        //println("C1: " + Conversions.checksum(c1.rBuffer.array()))
 
         channelService.tick
 
         // read from buffer
         val c2Buf = ByteBuffer.allocate(bufferLengthInBytes)
-        c2.clientReadWrite(c2Buf)
+        c2.clientWriteRead(c2Buf)
         println("c2Buf: " + Conversions.checksum(c2Buf.array()))
 
         val c3Buf = ByteBuffer.allocate(bufferLengthInBytes)
-        c3.clientReadWrite(c3Buf)
+        c3.clientWriteRead(c3Buf)
         println("c3Buf: " + Conversions.checksum(c3Buf.array()))
 
         channelService.tap

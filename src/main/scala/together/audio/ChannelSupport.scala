@@ -28,7 +28,7 @@ trait ChannelSupport {
       clCtr = clCtr + bytesRead
     }
 
-    //logger.debug(s"RCV: readchannel=complete ${buf.array().map(printBinary(_)).mkString(",")}")
+    //logger.debug(s"RCV: readchannel=complete ${Conversions.checksum(buf.array())}")
     buf
   }
 

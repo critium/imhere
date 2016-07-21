@@ -104,11 +104,15 @@ class ChannelServiceImpl(debug:Boolean) extends ChannelServiceTrait with Channel
 
   override def getOtherPipelinesInRoom(userId:Long):List[AudioPipeline] = {
     dataService.getOthersInRoom(userId).map { otherUserId =>
+      logger.debug("Getting Pipelines: " + userId + " " + otherUserId)
       getAudioPipeline(otherUserId)
     }.flatten
   }
 
   private def getAudioPipeline(userId:Long):Option[AudioPipeline] = {
+    logger.debug("  Building Pipelines: " + getChannels(userId).get(userId).size)
+    logger.debug("  Building Pipelines: " + getBuffers(userId).get(userId).size)
+
     for {
       c <- getChannels(userId).get(userId)
       b <- getBuffers(userId).get(userId)
@@ -146,7 +150,11 @@ class ChannelWriter(dataService:DataServiceTrait) extends Runnable with ChannelS
     users -= userId
   }
 
-  def writeMultiple(aUser:AudioPipeline) = {
+  def writeMultiple(aUser:AudioPipeline, tick:Boolean = false) = {
+    if(tick){
+
+    }
+
     readChannel(bufferLengthInBytes, aUser.channel, Some(readBuf))
     aUser.buffer.write(readBuf.array)
     readBuf.clear()
@@ -164,7 +172,8 @@ class ChannelWriter(dataService:DataServiceTrait) extends Runnable with ChannelS
   }
 
   def tick = {
-    users.values.foreach( writeMultiple(_) )
+    logger.debug("WRITE TICK: Users:" + users.size)
+    users.values.foreach( writeMultiple(_, true) )
   }
 
   def tap:Unit = {
@@ -181,7 +190,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
 
   case class ChannelReaderContext(
     userId:Long,
-    var view:List[AudioView],
+    var view:Map[Long, AudioView],
     var others:List[AudioPipeline],
     var level:Int,
     val readCt:mutable.Map[Long, Int],
@@ -192,6 +201,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
   var contexts:mutable.Map[Long, ChannelReaderContext] = mutable.Map[Long, ChannelReaderContext]()
 
   val baseline = Array.ofDim[Byte](bufferLengthInBytes)
+  val baselineFoat = Array.ofDim[Float](bufferLengthInBytes / timesFloat)
   val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
 
   def removeUser(userId:Long):Unit = {
@@ -200,7 +210,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
 
   def addUser(aUser:AudioPipeline, roomId:Long):Unit = {
     val userId = aUser.id
-    var view:List[AudioView] = dataService.getAudioViewForUser(userId)
+    var view:Map[Long, AudioView] = dataService.getAudioViewForUser(userId)
     var others:List[AudioPipeline] = channelService.getOtherPipelinesInRoom(userId)
     var level = others.size
     val readCt = mutable.Map[Long,Int]();
@@ -209,29 +219,54 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
 
   def readMultiple(context:ChannelReaderContext):Unit = {
     val userId = context.userId
+
     if(context.pos(userId) % bufferCheck == 0) {
-      val roomId = dataService.getRoomIdForUser(userId)
+      logger.debug("READ MULTIPLE, a")
+      //val roomId = dataService.getRoomIdForUser(userId)
       context.others = channelService.getOtherPipelinesInRoom(userId)
       context.level = context.others.size
       context.view = dataService.getAudioViewForUser(userId)
     }
 
-    ////view = DataService.getAudioViewForUser(userId)
+
+    //view = DataService.getAudioViewForUser(userId)
+    //TODO: Need to figure out if we're going to hit cutoff here
+    logger.debug("READ Context: " + context.userId)
     if(context.view.size > 1) {
-      var sumStreams:Array[Byte] = context.others.foldLeft(baseline){ ( l,c ) =>
-        val (newPos, thisStream) = c.buffer.read(Some(context.pos(userId)), userId)
-        context.readCt += (userId -> newPos)
+      var trueNumStreams = 0
+      val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFoat){ ( l,c ) =>
+        val otherUserId = c.id
+        val viewMaybe = context.view.get(otherUserId)
+        val fctr:Float = viewMaybe match {
+          case Some(view) =>
+            .1f
+          case _ =>
+            .1f
+        }
+        val (newPos, thisStream) = c.buffer.read(Some(context.pos(otherUserId)), userId)
+        context.readCt += (otherUserId -> newPos)
+        val thisStreamFloat = toFloatArray(thisStream)
+
+        //logger.debug(s"  READ Context:$otherUserId=>$userId")
         if(java.util.Arrays.equals(thisStream,baseline)) {
           l
-        } else {
-          for(i <- 0 until bufferLengthInBytes) {
-            l(i) = thisStream(i)
-          }
+        } else if(thisStream.size == 0) {
           l
+        } else {
+          trueNumStreams = trueNumStreams + 1
+          sumFloatArrays(l, thisStreamFloat, fctr)
         }
       }
 
-      writeChannel(ByteBuffer.wrap(sumStreams), context.channel)
+      // normalize volume.
+      val normalizedFloat = normalizeFloat(sumStreamsFloat, 1f / trueNumStreams)
+
+      // convert float to bytes
+      val sumStreamsByte = toByteArray(normalizedFloat)
+
+      // write to channel
+      logger.debug("READ Context: Writing Streams " + Conversions.checksum(sumStreamsByte))
+      writeChannel(ByteBuffer.wrap(sumStreamsByte), context.channel)
 
     } else {
       logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
@@ -252,6 +287,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
   }
 
   def tick = {
+    logger.debug("READ TICK: " + contexts.size)
     contexts.values.foreach { readMultiple(_) }
   }
 }

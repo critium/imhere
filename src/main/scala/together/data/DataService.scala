@@ -31,7 +31,7 @@ trait DataServiceTrait {
   def listRooms(userId:Long):List[Room]
   def logout(userId:Long):Boolean
   def registerServer(audioServer:AudioServerInfo):Unit
-  def getAudioViewForUser(userId:Long):List[AudioView]
+  def getAudioViewForUser(userId:Long):Map[Long, AudioView]
   def getRoomIdForUser(userId:Long):Option[Long]
   def getHostInfo(user:User):HostInfo
   def getOthersInRoom(userId:Long):List[Long]
@@ -209,18 +209,22 @@ class DataServiceImpl extends DataServiceTrait {
     }
   }
 
-  override def getAudioViewForUser(userId:Long):List[AudioView] = {
+  override def getAudioViewForUser(userId:Long):Map[Long, AudioView] = {
     // gets all users (not self)
-    //val allUserAudioView = getViews(userId).filterKeys(_.fromId == userId).values.toList
-    val allUserAudioView = getViews(userId).filterKeys(_.fromId == userId)
+    val allUserAudioView:Map[AudioViewKey, AudioView]= getViews(userId).filterKeys(_.fromId == userId).toMap
 
     // remove user not in the room
     val currentRoom = getUserRoom(userId).get(userId).map(_.roomId)
-    val res = allUserAudioView filterKeys (k =>
+    val views:Map[AudioViewKey, AudioView] = allUserAudioView filterKeys (k =>
         currentRoom == getUserRoom(userId).get(k.toId).map(_.roomId))
-    //logger.debug(s"1st Views2: ${userId}=>${res}")
+    //logger.debug(s"1st Views2: ${userId}=>${views}")
 
-    res.values.toList
+    views.values.toList
+    val res:Map[Long, AudioView] = views map { case (k:AudioViewKey,v:AudioView) =>
+      (k.toId -> v)
+    }
+
+    res
   }
 
   override def changeVolume(userId:Long, toUserId:Long, vol:Volume.Value):Option[Int] = {

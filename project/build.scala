@@ -41,6 +41,7 @@ object imhereproject extends Build {
       // Read here for optional jars and dependencies
       libraryDependencies ++= Seq(
         "org.json4s"        %% "json4s-jackson"    % Json4sVersion,
+        "com.typesafe"      % "config"             % "1.2.0",
 
         "org.scalatra"      %% "scalatra"          % ScalatraVersion,
         "org.scalatra"      %% "scalatra-scalate"  % ScalatraVersion,
