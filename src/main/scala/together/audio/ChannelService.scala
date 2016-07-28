@@ -201,7 +201,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
   var contexts:mutable.Map[Long, ChannelReaderContext] = mutable.Map[Long, ChannelReaderContext]()
 
   val baseline = Array.ofDim[Byte](bufferLengthInBytes)
-  val baselineFoat = Array.ofDim[Float](bufferLengthInBytes / timesFloat)
+  val baselineFloat = Array.ofDim[Float](bufferLengthInBytes / timesFloat)
   val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
 
   def removeUser(userId:Long):Unit = {
@@ -234,7 +234,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
     logger.debug("READ Context: " + context.userId)
     if(context.view.size > 1) {
       var trueNumStreams = 0
-      val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFoat){ ( l,c ) =>
+      val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFloat){ ( l,c ) =>
         val otherUserId = c.id
         val viewMaybe = context.view.get(otherUserId)
         val fctr:Float = viewMaybe match {
@@ -243,9 +243,9 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
           case _ =>
             .1f
         }
+        //val fctr = 1f
         val (newPos, thisStream) = c.buffer.read(Some(context.pos(otherUserId)), userId)
         context.readCt += (otherUserId -> newPos)
-        val thisStreamFloat = toFloatArray(thisStream)
 
         //logger.debug(s"  READ Context:$otherUserId=>$userId")
         if(java.util.Arrays.equals(thisStream,baseline)) {
@@ -253,20 +253,27 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
         } else if(thisStream.size == 0) {
           l
         } else {
+          val thisStreamFloat = toFloatArray(thisStream)
           trueNumStreams = trueNumStreams + 1
-          sumFloatArrays(l, thisStreamFloat, fctr)
+          val res = sumFloatArrays(l, thisStreamFloat, fctr)
+          res
         }
       }
 
-      // normalize volume.
-      val normalizedFloat = normalizeFloat(sumStreamsFloat, 1f / trueNumStreams)
+      val outStream:Array[Byte] = if(trueNumStreams != 0) {
+        // normalize volume.
+        val normalizedFloat = normalizeFloat(sumStreamsFloat, 1f / trueNumStreams)
 
-      // convert float to bytes
-      val sumStreamsByte = toByteArray(normalizedFloat)
+        // convert float to bytes
+        toByteArray(normalizedFloat)
+
+      } else {
+        baseline
+      }
 
       // write to channel
-      logger.debug("READ Context: Writing Streams " + Conversions.checksum(sumStreamsByte))
-      writeChannel(ByteBuffer.wrap(sumStreamsByte), context.channel)
+      logger.debug("READ Context: Writing Streams " + Conversions.checksum(outStream) + " normalized with " + trueNumStreams)
+      writeChannel(ByteBuffer.wrap(outStream), context.channel)
 
     } else {
       logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)

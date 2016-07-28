@@ -115,11 +115,12 @@ object Conversions {
   }
 
   def sumFloatArrays(lF:Array[Float], rF:Array[Float], rFctr:Float):Array[Float] = {
+    val floats = Array.ofDim[Float](lF.length)
     for(i <- 0 until lF.size) {
-      lF(i) = lF(i) + (rF(i) * rFctr)
+      floats(i) = lF(i) + (rF(i) * rFctr)
+      //println(s"FLOAT SUM: ${floats(i)} = ${lF(i)} + (${rF(i)} * $rFctr) ")
     }
-
-    lF
+    floats
   }
 
   def normalizeFloat(floats:Array[Float], factor:Float):Array[Float] = {
@@ -143,17 +144,17 @@ object Conversions {
   }
 
   def toFloatArrayFill(totalLength:Int, fill:Float):Array[Byte] = {
-    val a = Array.fill(timesFloat)(fill.toByte)
-    val floats = Array.ofDim[Byte](totalLength)
-    val numFloats = totalLength / a.length
+    val floatBuf = ByteBuffer.allocate(totalLength)
 
-    println(s"Conversion: ${totalLength} / ${timesFloat} / ${numFloats} / ${floats.length}")
-
-    for(i <- 0 until numFloats) {
-      for(j <- 0 until a.length) {
-        floats(i+j) = a(j)
-      }
+    while(floatBuf.hasRemaining) {
+      floatBuf.putFloat(fill)
     }
+
+    val floats = floatBuf.array()
+
+    //println("FLOATS FILL: " + fill + " >>>> " + toFloatArray(floats).mkString(","))
+    //println(s"Conversion: ${totalLength} / ${timesFloat} / ${numFloats} / ${floats.length}")
+
     floats
   }
 

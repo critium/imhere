@@ -54,7 +54,7 @@ class DataServiceSpec extends mutable.Specification {
 
   var ct = 0
   var room3:Room = null
-  var u2Av:List[AudioView] = null
+  var u2Av:Map[Long, AudioView] = null
 
 
   sequential
@@ -284,7 +284,7 @@ class DataServiceSpec extends mutable.Specification {
       "user 3 volume should start at 5" in {
         u2Av = ds.getAudioViewForUser(u2.id)
         println("U2AV: " + u2Av.mkString(","))
-        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(5)
+        u2Av.get(u3.id).map(_.volume) must beSome(5)
       }
       "user 3 volume should end at 6" in {
         val res = ds.changeVolume(u2.id, u3.id, Volume.UP)
@@ -294,7 +294,7 @@ class DataServiceSpec extends mutable.Specification {
       "user 3 volume should end at 7" in {
         val res = ds.changeVolume(u2.id, u3.id, Volume.UP)
         res must beSome(7)
-        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(7)
+        u2Av.get(u3.id).map(_.volume) must beSome(7)
       }
     }
 
@@ -310,7 +310,7 @@ class DataServiceSpec extends mutable.Specification {
         ds.changeVolume(u2.id, u3.id, Volume.UP)
         val res = ds.changeVolume(u2.id, u3.id, Volume.UP)
         res must beSome(10)
-        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(10)
+        u2Av.get(u3.id).map(_.volume) must beSome(10)
       }
     }
 
@@ -318,7 +318,7 @@ class DataServiceSpec extends mutable.Specification {
       "user 3 volume should go back to 9" in {
         val res = ds.changeVolume(u2.id, u3.id, Volume.DOWN)
         res must beSome(9)
-        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(9)
+        u2Av.get(u3.id).map(_.volume) must beSome(9)
       }
     }
 
@@ -338,7 +338,7 @@ class DataServiceSpec extends mutable.Specification {
         ds.changeVolume(u2.id, u3.id, Volume.DOWN)
         val res = ds.changeVolume(u2.id, u3.id, Volume.DOWN)
         res must beSome(0)
-        u2Av.find(_.userId == u3.id).map(_.volume) must beSome(0)
+        u2Av.get(u3.id).map(_.volume) must beSome(0)
       }
     }
 
@@ -346,7 +346,7 @@ class DataServiceSpec extends mutable.Specification {
       "do it" in {
         ds.getUserRoom(u1.id).get(u1.id) should beSome
         ds.getAudioViewForUser(u2.id).size must be_>=(1)
-        ds.getAudioViewForUser(u3.id).find(_.userId == u2.id) should beSome
+        ds.getAudioViewForUser(u3.id).get(u2.id) should beSome
         ds.getUsers(u3.id).get(u2.id) should beSome
         ds.logout(u2.id)
       }
@@ -357,7 +357,7 @@ class DataServiceSpec extends mutable.Specification {
 
       "views should remove it" in {
         ds.getAudioViewForUser(u2.id).size must be_==(0)
-        ds.getAudioViewForUser(u3.id).find(_.userId == u2.id) should beNone
+        ds.getAudioViewForUser(u3.id).get(u2.id) should beNone
       }
 
       "users should remove it" in {
