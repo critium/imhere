@@ -26,15 +26,9 @@ class DataServiceSpec extends mutable.Specification {
     }
   }
 
-  println("1")
   val channelService = ServiceLocator.channelService
-  println("1")
   val ds = ServiceLocator.dataService.asInstanceOf[DataServiceImpl]
-  println("1")
-
-  println("1")
   ds.registerServer(AudioServerInfo("127.0.0.1", "localhost", 55555))
-  println("1")
 
   val u1 = User(1, "User 1", 1, 1, "#")
   val u2 = User(2, "User 2", 1, 1, "#")

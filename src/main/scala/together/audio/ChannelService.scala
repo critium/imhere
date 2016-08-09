@@ -9,6 +9,7 @@ import together.data._
 import together.audio.Conversions._
 
 import scala.collection.mutable
+import scala.collection.immutable.HashSet
 import scala.util._
 
 import org.slf4j.LoggerFactory
@@ -194,6 +195,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
     var others:List[AudioPipeline],
     var level:Int,
     val readCt:mutable.Map[Long, Int],
+    var talking:HashSet[Long],
     channel:ByteChannel) {
       def pos(userId:Long):Int = readCt.get(userId).getOrElse(0)
     }
@@ -214,36 +216,42 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
     var others:List[AudioPipeline] = channelService.getOtherPipelinesInRoom(userId)
     var level = others.size
     val readCt = mutable.Map[Long,Int]();
-    contexts += (userId -> ChannelReaderContext(userId, view, others, level, readCt, aUser.channel))
+    var talking:HashSet[Long] = HashSet[Long]() ++ dataService.whosTalking(userId)
+    contexts += (userId -> ChannelReaderContext(userId, view, others, level, readCt, talking, aUser.channel))
   }
 
-  def readMultiple(context:ChannelReaderContext):Unit = {
+  def readMultiple(context:ChannelReaderContext, isTick:Boolean):Unit = {
     val userId = context.userId
 
-    if(context.pos(userId) % bufferCheck == 0) {
-      logger.debug("READ MULTIPLE, a")
+    //logger.debug("READ Context: userId: " + context.userId)
+
+    if(isTick || context.pos(userId) % bufferCheck == 0) {
       //val roomId = dataService.getRoomIdForUser(userId)
       context.others = channelService.getOtherPipelinesInRoom(userId)
       context.level = context.others.size
       context.view = dataService.getAudioViewForUser(userId)
+      context.talking = HashSet[Long]() ++ dataService.whosTalking(userId)
     }
 
+    logger.debug(s"READ ${context.userId} Context: others: ${context.others.size}")
+    logger.debug(s"READ ${context.userId} Context: view: ${context.view.size}")
 
     //view = DataService.getAudioViewForUser(userId)
     //TODO: Need to figure out if we're going to hit cutoff here
-    logger.debug("READ Context: " + context.userId)
-    if(context.view.size > 1) {
+    val userTalking = context.talking.contains(userId)
+    if(context.view.size >= 1) {
       var trueNumStreams = 0
       val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFloat){ ( l,c ) =>
         val otherUserId = c.id
         val viewMaybe = context.view.get(otherUserId)
-        val fctr:Float = viewMaybe match {
-          case Some(view) =>
-            .1f
-          case _ =>
-            .1f
+        val otherTalking = context.talking.contains(otherUserId)
+        val useFctr =(userTalking && otherTalking)
+        val streamFctrMaybe = viewMaybe.map(_.streamFctr)
+        logger.debug(s"READ ${context.userId}, is talking ${userTalking} && ${otherTalking} = ${useFctr} {${streamFctrMaybe}}")
+        val fctr:Float = (useFctr, viewMaybe) match {
+          case (true, Some(view)) => view.streamFctr
+          case (_, _) => .1f
         }
-        //val fctr = 1f
         val (newPos, thisStream) = c.buffer.read(Some(context.pos(otherUserId)), userId)
         context.readCt += (otherUserId -> newPos)
 
@@ -261,6 +269,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
       }
 
       val outStream:Array[Byte] = if(trueNumStreams != 0) {
+        logger.debug(s"READ ${context.userId} stream: sending out true stream")
         // normalize volume.
         val normalizedFloat = normalizeFloat(sumStreamsFloat, 1f / trueNumStreams)
 
@@ -268,16 +277,17 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
         toByteArray(normalizedFloat)
 
       } else {
+        logger.debug(s"READ ${context.userId} stream: sending out baseline")
         baseline
       }
 
       // write to channel
-      logger.debug("READ Context: Writing Streams " + Conversions.checksum(outStream) + " normalized with " + trueNumStreams)
+      logger.debug(s"READ ${context.userId}: Writing Streams ${Conversions.checksum(outStream)} normalized with ${trueNumStreams}")
       writeChannel(ByteBuffer.wrap(outStream), context.channel)
 
     } else {
-      logger.debug("no connections. sleeping /bl:h" + bufferLengthInBytes)
-      Thread.sleep(1*1000)
+      logger.debug(s"READ ${context.userId}: no connections. sleeping /bl:h" + bufferLengthInBytes)
+      //Thread.sleep(1*1000)
       Thread.`yield`
     }
   }
@@ -288,13 +298,13 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
 
   def run() = {
     while(running){
-      contexts.values.foreach { readMultiple(_) }
+      contexts.values.foreach { readMultiple(_, false) }
     }
     logger.debug("SHUTTING DOWN READER")
   }
 
   def tick = {
     logger.debug("READ TICK: " + contexts.size)
-    contexts.values.foreach { readMultiple(_) }
+    contexts.values.foreach { readMultiple(_, true) }
   }
 }

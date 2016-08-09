@@ -90,7 +90,7 @@ package object data {
 
   case class AudioViewKey(fromId:Long, toId:Long)
   case class AudioView(userId:Long, var volume:Int){
-    def streamFctr = volume / NORMAL_LEVEL
+    def streamFctr:Float = volume.toFloat / NORMAL_LEVEL
     def changeVolume(vol:Volume.Value) = {
       (this.volume, vol) match {
         case (i, Volume.UP) if (i + 1) >= MAX_VOL =>
