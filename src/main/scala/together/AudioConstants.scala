@@ -39,6 +39,9 @@ package object audio {
   val bufferBarrier = 128 // this is much too large, but lets see
   val bufferCheck = 10;
 
+  val DB_MIN = -48
+  val DB_MAX = 20
+  val CLIP_PCM = 32635
   val MAX_VOL = 10
   val MIN_VOL = 0
   val SILENT_FCTR = .1

@@ -37,7 +37,7 @@ package object data {
       ("id"-> s.id) ~
       ("name" -> s.name) ~
       ("domainId" -> s.domainId) ~
-      ("groupId" -> s.groupId)
+      ("groupId" -> s.groupId) ~
       ("hash" -> s.hash)
     }}
   }

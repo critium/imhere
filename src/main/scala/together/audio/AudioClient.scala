@@ -321,6 +321,9 @@ object AudioClient {
       val response: HttpResponse[String] =
         Http(url).postData(data).header("content-type", "application/json").asString
 
+      //println(" SND: user: " + user + "->" + data)
+      //println(" RCV: raw: " + response)
+
       loginInfo = Try(parse(response.body).extract[LoginInfo]) match {
         case Success(v) => Some(v)
         case Failure(e) =>

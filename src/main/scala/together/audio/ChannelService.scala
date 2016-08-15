@@ -111,8 +111,8 @@ class ChannelServiceImpl(debug:Boolean) extends ChannelServiceTrait with Channel
   }
 
   private def getAudioPipeline(userId:Long):Option[AudioPipeline] = {
-    logger.debug("  Building Pipelines: " + getChannels(userId).get(userId).size)
-    logger.debug("  Building Pipelines: " + getBuffers(userId).get(userId).size)
+    //logger.debug("  Building Pipelines: " + getChannels(userId).get(userId).size)
+    //logger.debug("  Building Pipelines: " + getBuffers(userId).get(userId).size)
 
     for {
       c <- getChannels(userId).get(userId)
@@ -233,37 +233,40 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
       context.talking = HashSet[Long]() ++ dataService.whosTalking(userId)
     }
 
-    logger.debug(s"READ ${context.userId} Context: others: ${context.others.size}")
-    logger.debug(s"READ ${context.userId} Context: view: ${context.view.size}")
+    //logger.debug(s"READ ${context.userId} Context: others: ${context.others.size}")
+    //logger.debug(s"READ ${context.userId} Context: view: ${context.view.size}")
 
     //view = DataService.getAudioViewForUser(userId)
     //TODO: Need to figure out if we're going to hit cutoff here
     val userTalking = context.talking.contains(userId)
     if(context.view.size >= 1) {
-      var trueNumStreams = 0
+      var trueNumStreams:Int = 0
       val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFloat){ ( l,c ) =>
         val otherUserId = c.id
         val viewMaybe = context.view.get(otherUserId)
         val otherTalking = context.talking.contains(otherUserId)
         val useFctr =(userTalking && otherTalking)
         val streamFctrMaybe = viewMaybe.map(_.streamFctr)
-        logger.debug(s"READ ${context.userId}, is talking ${userTalking} && ${otherTalking} = ${useFctr} {${streamFctrMaybe}}")
-        val fctr:Float = (useFctr, viewMaybe) match {
-          case (true, Some(view)) => view.streamFctr
+
+        //logger.debug(s"READ ${context.userId}, is talking ${userTalking} && ${otherTalking} = ${useFctr} {${streamFctrMaybe}}")
+        val fctr:Float = (useFctr, streamFctrMaybe) match {
+          case (true, Some(fctr)) => fctr
           case (_, _) => .1f
         }
+
         val (newPos, thisStream) = c.buffer.read(Some(context.pos(otherUserId)), userId)
         context.readCt += (otherUserId -> newPos)
 
-        //logger.debug(s"  READ Context:$otherUserId=>$userId")
+        logger.debug(s"  READ Context:$otherUserId=>$userId =>TSS: ${thisStream.size}")
         if(java.util.Arrays.equals(thisStream,baseline)) {
           l
         } else if(thisStream.size == 0) {
           l
         } else {
-          val thisStreamFloat = toFloatArray(thisStream)
+          //val thisStreamFloat = toFloatArray(thisStream)
+          val thisStreamFloat = pcmToFloatArray(pcmToShortArray(thisStream))
           trueNumStreams = trueNumStreams + 1
-          val res = sumFloatArrays(l, thisStreamFloat, fctr)
+          val res = sumFloatArrays(l, thisStreamFloat, 1)
           res
         }
       }

@@ -109,10 +109,61 @@ object Conversions {
     for(i <- 0 until floats.length) {
       val byteBuff = ByteBuffer.wrap(byteArray, i*timesFloat, timesFloat)
       byteBuff.order(ByteOrder.BIG_ENDIAN);
-      floats(i) = byteBuff.getFloat();
+      floats(i) = byteBuff.getFloat()
     }
     floats
   }
+
+  def pcmToFloatArray(pcms:Array[Short]):Array[Float] = {
+    val floats = Array.ofDim[Float](pcms.length)
+    for(i <- 0 until floats.length) {
+      floats(i) = pcms(i)
+    }
+    floats
+  }
+
+  def pcmToShortArray(bytes:Array[Byte]):Array[Short] = {
+    val shorts = Array.ofDim[Short](bytes.length / 2)
+    val bb = ByteBuffer.wrap(bytes);
+    for (i <- 0 until shorts.length) {
+      shorts(i) = bb.getShort()
+    }
+    shorts
+  }
+
+  def pcmToInt16(buffer:Array[Byte], byteOffset:Int, bigEndian:Boolean):Int = {
+    bigEndian match {
+      case true => ((buffer(byteOffset)<<8) | (buffer(byteOffset+1) & 0xFF))
+      case _ => ((buffer(byteOffset+1)<<8) | (buffer(byteOffset) & 0xFF))
+    }
+  }
+
+  def int16ToPCM(sampleRaw:Int, buffer:Array[Byte], byteOffset:Int, bigEndian:Boolean):Unit = {
+    val sample = clipInt16(sampleRaw)
+    //val buffer = Array[Byte](16)
+    //val buffer = Array.ofDim[Byte](2)
+
+    if (bigEndian) {
+      buffer(byteOffset)   = (sample >> 8).toByte
+      buffer(byteOffset+1) = (sample & 0xFF).toByte
+    }
+    else {
+      buffer(byteOffset)   = (sample & 0xFF).toByte
+      buffer(byteOffset+1) = (sample >> 8).toByte
+    }
+
+    //buffer
+  }
+
+  def clipInt16(src:Int):Int = {
+    if(src > 0 && src > CLIP_PCM) CLIP_PCM
+    else if(src < 0 && src < (-1 * CLIP_PCM)) -1 * CLIP_PCM
+    else src
+  }
+
+  def calculateGain(linearRatio:Float, minDB:Int = DB_MIN, maxDB:Int = DB_MAX):Float = {
+    Math.pow(10f,((linearRatio * (maxDB-minDB) + minDB)/20f))
+  }.toFloat
 
   def sumFloatArrays(lF:Array[Float], rF:Array[Float], rFctr:Float):Array[Float] = {
     val floats = Array.ofDim[Float](lF.length)
