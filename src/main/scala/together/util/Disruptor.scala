@@ -122,7 +122,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
     writePos = writePos + 1
     bufPos = writePos % size
 
-    logger.debug("w=>:"+marker.toString + ":" + Conversions.checksum(raw))
+    logger.debug("w=>:CH"+marker.toString + ">=" + writePos + ":" + Conversions.checksum(raw))
   }
 
   def calcPos = (writePos - bufSize) match {
@@ -135,7 +135,7 @@ class CircularByteBuffer(marker:Int, size:Int = bufferBarrier, bufSize:Int = buf
    */
   def read(posMaybe:Option[Int], userId:Long):(Int, Array[Byte])= {
     val pos = posMaybe.getOrElse(calcPos)
-    val msg1 = s"r<=:${marker.toString}=>${userId}:r:${pos}>=${writePos}:"
+    val msg1 = s"r<=:${marker.toString}=>CH${userId}:r:${pos}>=${writePos}:"
 
     val res = if (pos >= writePos) {
       (pos, Array.ofDim[Byte](0))

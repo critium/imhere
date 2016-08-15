@@ -58,7 +58,7 @@ object AudioClient {
 
   }
 
-  class Capture(socket:Option[Socket], filename:Option[String]) {
+  class Capture(socket:Option[Socket], filename:Option[String], marker:Option[Long]) {
     @volatile var halt = false;
 
     def getOut = {
@@ -75,7 +75,7 @@ object AudioClient {
 
       while(!halt) {
         val data = Array.ofDim[Byte]( bufferLengthInBytes )
-        sLogger.debug("Sending: " + Conversions.checksum(data))
+        sLogger.debug("Sending: CH" + marker.getOrElse(0) + " " + Conversions.checksum(data))
         out.write(data)
         out.flush()
 
@@ -95,7 +95,7 @@ object AudioClient {
       while(!halt) {
         val data = Array.ofDim[Byte]( bufferLengthInBytes )
         val readCt = in.read(data)
-        sLogger.debug("Sending: " + Conversions.checksum(data))
+        sLogger.debug("Sending: CH" + marker.getOrElse(0) + " " + Conversions.checksum(data))
         out.write(data)
         out.flush()
 
@@ -207,7 +207,7 @@ object AudioClient {
     }
   }
 
-  class Playback(socket:Option[Socket], file:Option[String] = None) {
+  class Playback(socket:Option[Socket], file:Option[String] = None, marker:Option[Long]) {
     @volatile var pwait = true;
 
     def getIn = {
@@ -273,7 +273,7 @@ object AudioClient {
           } else {
             //var numBytesRemaining = numBytesRead;
             //while (numBytesRemaining > 0 ) {
-              rLogger.debug("Receiving: " + Conversions.checksum(data))
+              rLogger.debug("Receiving: CH" + marker.getOrElse(0) + ":" + Conversions.checksum(data))
               //numBytesRemaining -= line.write(data, 0, numBytesRemaining);
               line.write(data, 0, numBytesRead)
             //}
@@ -519,14 +519,14 @@ object AudioClient {
       handshake(loginInfo.get, socket.get)
     }
 
-    val c = new Capture(socket, fileName)
+    val c = new Capture(socket, fileName, loginInfo.map(_.user.id))
     val f1 = (blank, fileName) match {
       case (true, _) => Future(c.runItBlank())
       case (false, Some(f)) => Future(c.runItFile(f))
       case (false, None) => Future(c.runIt)
     }
 
-    val p = new Playback(socket)
+    val p = new Playback(socket, None, loginInfo.map(_.user.id))
     Future(p.runIt)
 
     //readLine()

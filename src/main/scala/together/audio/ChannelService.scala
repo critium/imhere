@@ -203,7 +203,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
   var contexts:mutable.Map[Long, ChannelReaderContext] = mutable.Map[Long, ChannelReaderContext]()
 
   val baseline = Array.ofDim[Byte](bufferLengthInBytes)
-  val baselineFloat = Array.ofDim[Float](bufferLengthInBytes / timesFloat)
+  val baselineInt = Array.ofDim[Int](bufferLengthInBytes / timesInt16)
   val readBytes = Array.ofDim[Byte](bufferLengthInBytes)
 
   def removeUser(userId:Long):Unit = {
@@ -241,7 +241,7 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
     val userTalking = context.talking.contains(userId)
     if(context.view.size >= 1) {
       var trueNumStreams:Int = 0
-      val sumStreamsFloat:Array[Float] = context.others.foldLeft(baselineFloat){ ( l,c ) =>
+      val sumStreamsInt:Array[Int] = context.others.foldLeft(baselineInt){ ( l,c ) =>
         val otherUserId = c.id
         val viewMaybe = context.view.get(otherUserId)
         val otherTalking = context.talking.contains(otherUserId)
@@ -249,47 +249,56 @@ class ChannelReader(dataService:DataServiceTrait, channelService:ChannelServiceT
         val streamFctrMaybe = viewMaybe.map(_.streamFctr)
 
         //logger.debug(s"READ ${context.userId}, is talking ${userTalking} && ${otherTalking} = ${useFctr} {${streamFctrMaybe}}")
-        val fctr:Float = (useFctr, streamFctrMaybe) match {
-          case (true, Some(fctr)) => fctr
-          case (_, _) => .1f
-        }
+        //TODO:temporarily diable fctr
+        //val fctr:Float = (useFctr, streamFctrMaybe) match {
+          //case (true, Some(fctr)) => calculateGain(fctr)
+          //case (_, _) => calculateGain(.1f)
+        //}
+        val fctr = 1f
 
-        val (newPos, thisStream) = c.buffer.read(Some(context.pos(otherUserId)), userId)
+        val oldPos = context.pos(otherUserId)
+        val (newPos, thisStream) = c.buffer.read(Some(oldPos), userId)
         context.readCt += (otherUserId -> newPos)
 
-        logger.debug(s"  READ Context:$otherUserId=>$userId =>TSS: ${thisStream.size}")
+        //logger.debug(s"  READ Context:$otherUserId=>$userId =>TSS: ${thisStream.size}")
         if(java.util.Arrays.equals(thisStream,baseline)) {
           l
         } else if(thisStream.size == 0) {
           l
         } else {
-          //val thisStreamFloat = toFloatArray(thisStream)
-          val thisStreamFloat = pcmToFloatArray(pcmToShortArray(thisStream))
+          logger.debug(s"READ CH${context.userId}: POS:($oldPos=>$newPos) + Writing Streams ${Conversions.checksum(thisStream)}")
+          val thisStreamInt = pcmToInt16(thisStream)
           trueNumStreams = trueNumStreams + 1
-          val res = sumFloatArrays(l, thisStreamFloat, 1)
-          res
+          //TODO:temporarily disable sumIntArrays
+          //TODO: This is broken...why?
+          //val res = sumIntArrays(l, thisStreamInt, fctr)
+          //res
+
+          thisStreamInt
         }
       }
 
       val outStream:Array[Byte] = if(trueNumStreams != 0) {
-        logger.debug(s"READ ${context.userId} stream: sending out true stream")
+        //logger.debug(s"READ ${context.userId} stream: sending out true stream")
+        //TODO:Temporarily disable normalize
         // normalize volume.
-        val normalizedFloat = normalizeFloat(sumStreamsFloat, 1f / trueNumStreams)
+        //val normalizedInt = normalizeInt(sumStreamsInt, 1f / trueNumStreams)
+        val normalizedInt = sumStreamsInt
 
-        // convert float to bytes
-        toByteArray(normalizedFloat)
+        // convert int to bytes
+        int16ToPCM(normalizedInt)
 
       } else {
-        logger.debug(s"READ ${context.userId} stream: sending out baseline")
+        logger.debug(s"READ CH${context.userId} stream: sending out baseline")
         baseline
       }
 
       // write to channel
-      logger.debug(s"READ ${context.userId}: Writing Streams ${Conversions.checksum(outStream)} normalized with ${trueNumStreams}")
+      logger.debug(s"READ CH${context.userId}: Writing Streams ${Conversions.checksum(outStream)} normalized with ${trueNumStreams}")
       writeChannel(ByteBuffer.wrap(outStream), context.channel)
 
     } else {
-      logger.debug(s"READ ${context.userId}: no connections. sleeping /bl:h" + bufferLengthInBytes)
+      logger.debug(s"READ CH${context.userId}: no connections. sleeping /bl:h" + bufferLengthInBytes)
       //Thread.sleep(1*1000)
       Thread.`yield`
     }

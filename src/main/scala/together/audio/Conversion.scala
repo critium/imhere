@@ -3,10 +3,10 @@ package together.audio
 import java.lang.Math
 import java.nio._
 
-/**
- * Parts converted from http://stackoverflow.com/questions/16389205/simple-bandpass-filter-in-java
- */
 object Conversions {
+  private val timesInt = java.lang.Integer.SIZE / java.lang.Byte.SIZE
+  val timesInt16 = timesInt * 2
+
   val dByteLen = 8
   def toByteArray(value:Double):Array[Byte] = {
     val bytes = Array.ofDim[Byte](dByteLen)
@@ -131,11 +131,32 @@ object Conversions {
     shorts
   }
 
+  def pcmToInt16(stream:Array[Byte]):Array[Int] = {
+    val intStream = Array.ofDim[Int](stream.length/2)
+    for(i <- 0 until intStream.length ) {
+      val pos = i*2;
+      intStream(i) = pcmToInt16(stream, pos, bigEndian)
+    }
+
+    intStream
+  }
+
   def pcmToInt16(buffer:Array[Byte], byteOffset:Int, bigEndian:Boolean):Int = {
     bigEndian match {
       case true => ((buffer(byteOffset)<<8) | (buffer(byteOffset+1) & 0xFF))
       case _ => ((buffer(byteOffset+1)<<8) | (buffer(byteOffset) & 0xFF))
     }
+  }
+
+  def int16ToPCM(intStream:Array[Int]):Array[Byte] = {
+    // int 16 to pcm is double length
+    val outStream = Array.ofDim[Byte](intStream.length * 2)
+    for(i <- 0 until intStream.length ) {
+      val pos = i*2;
+      int16ToPCM(intStream(i), outStream, pos, bigEndian)
+    }
+
+    outStream
   }
 
   def int16ToPCM(sampleRaw:Int, buffer:Array[Byte], byteOffset:Int, bigEndian:Boolean):Unit = {
@@ -180,6 +201,23 @@ object Conversions {
     }
 
     floats
+  }
+
+  def sumIntArrays(lF:Array[Int], rF:Array[Int], rFctr:Float):Array[Int] = {
+    val ints = Array.ofDim[Int](lF.length)
+    for(i <- 0 until lF.size) {
+      ints(i) = lF(i) + (rF(i) * rFctr).toInt
+      //println(s"FLOAT SUM: ${ints(i)} = ${lF(i)} + (${rF(i)} * $rFctr) ")
+    }
+    ints
+  }
+
+  def normalizeInt(ints:Array[Int], factor:Float):Array[Int] = {
+    for(i <- 0 until ints.size) {
+      ints(i) = (ints(i)  * factor).toInt
+    }
+
+    ints
   }
 
   def sumFloatBytes(lArr:Array[Byte], rArr:Array[Byte], rFctr:Float):Array[Byte] = {
